@@ -3,8 +3,10 @@ import ExcelImporter from './components/ExcelImporter';
 import GourmetMap from './components/GourmetMap';
 import Sidebar from './components/Sidebar';
 import DetailPanel from './components/DetailPanel';
+import GourmetToolkit from './components/GourmetToolkit';
 import type { RestaurantRaw } from './utils/excel';
 import { geocodeAddress, getDefaultFallbackCoordinates } from './utils/geocoder';
+import { Sparkles } from 'lucide-react';
 import L from 'leaflet';
 
 const LOCAL_STORAGE_KEY = 'daedong_restaurants_data';
@@ -21,6 +23,17 @@ export default function App() {
 
   // 화면 크기 (모바일 여부) 상태 관리
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
+
+  // 미식 툴킷 상태 관리
+  const [isToolkitOpen, setIsToolkitOpen] = useState(false);
+  const [visitedRestaurants, setVisitedRestaurants] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (isToolkitOpen) {
+      const visited = JSON.parse(localStorage.getItem('daedong_visited') || '[]');
+      setVisitedRestaurants(visited);
+    }
+  }, [isToolkitOpen]);
 
   useEffect(() => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
@@ -259,12 +272,60 @@ export default function App() {
             onResetData={handleResetData}
             onGPSClick={handleGPSClick}
             isMobile={isMobile}
+            mapRef={mapRef}
           />
 
           {/* 우하단 개별 맛집 정보 상세 오버레이 카드 */}
           <DetailPanel 
             restaurant={selectedRestaurant}
             onClose={() => setSelectedRestaurant(null)}
+            isMobile={isMobile}
+          />
+
+          {/* 미식 툴킷 플로팅 버튼 */}
+          <button
+            onClick={() => setIsToolkitOpen(true)}
+            className="animate-pulse-cyan"
+            style={{
+              position: 'fixed',
+              bottom: '24px',
+              right: selectedRestaurant ? (isMobile ? '24px' : '432px') : '24px',
+              width: '56px',
+              height: '56px',
+              borderRadius: '50%',
+              background: 'linear-gradient(135deg, var(--accent-pink) 0%, var(--accent-cyan) 100%)',
+              border: 'none',
+              color: '#ffffff',
+              cursor: 'pointer',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              boxShadow: '0 0 20px rgba(6, 182, 212, 0.4)',
+              zIndex: 999,
+              transition: 'all 0.3s cubic-bezier(0.4, 0, 0.2, 1)'
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.transform = 'scale(1.1) rotate(15deg)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.transform = 'scale(1) rotate(0deg)';
+            }}
+          >
+            <Sparkles size={24} />
+          </button>
+
+          {/* 미식 툴킷 모달 */}
+          <GourmetToolkit
+            isOpen={isToolkitOpen}
+            onClose={() => setIsToolkitOpen(false)}
+            restaurants={restaurants}
+            onSelectRestaurant={(rest) => {
+              setSelectedRestaurant(rest);
+              if (rest.latitude && rest.longitude && mapRef.current) {
+                mapRef.current.setView([rest.latitude, rest.longitude], 15, { animate: true, duration: 1.0 });
+              }
+            }}
+            visitedRestaurants={visitedRestaurants}
             isMobile={isMobile}
           />
         </>
