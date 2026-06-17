@@ -1,0 +1,18 @@
+{
+  "name": "대동맛지도",
+  "short_name": "대동맛지도",
+  "description": "전국 방방곡곡의 면밀한 맛집 탐색기",
+  "start_url": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#030712",
+  "theme_color": "#030712",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "sizes": "192x192 512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
