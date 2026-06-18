@@ -148,6 +148,7 @@ export default function App() {
       return true;
     }
   });
+  const [onboardingTaste, setOnboardingTaste] = useState('전체');
 
   const handleOpenToolkitTab = useCallback((tab: typeof toolkitTab) => {
     setToolkitTab(tab);
@@ -160,6 +161,26 @@ export default function App() {
     } catch {
       // ignore
     }
+
+    if (onboardingTaste && onboardingTaste !== '전체') {
+      setSelectedCategory(onboardingTaste);
+
+      if (restaurants.length > 0) {
+        const categoryRestaurants = restaurants.filter(r => r.category === onboardingTaste);
+        if (categoryRestaurants.length > 0) {
+          const sorted = [...categoryRestaurants].sort((a, b) => b.rating - a.rating);
+          const topRest = sorted[0];
+
+          setTimeout(() => {
+            handleSelectRestaurant(topRest);
+            if (topRest.latitude && topRest.longitude && mapRef.current) {
+              mapRef.current.setView([topRest.latitude, topRest.longitude], 15, { animate: true, duration: 1.0 });
+            }
+          }, 100);
+        }
+      }
+    }
+
     setShowWelcomeModal(false);
   };
 
@@ -750,6 +771,52 @@ export default function App() {
                   </div>
                   <div style={{ color: '#cbd5e1' }}>
                     🎮 <strong style={{ color: 'var(--accent-purple)' }}>풍성한 인터랙티브 툴킷</strong>: 룰렛 추천, 미식 MBTI 궁합 매칭, 노포 이상형 월드컵 및 단톡방 회식 예약 초대장까지 제공합니다.
+                  </div>
+
+                  {/* 선호 카테고리 퀵 선택 */}
+                  <div style={{
+                    borderTop: '1px dashed rgba(255,255,255,0.08)',
+                    paddingTop: '12px',
+                    marginTop: '4px'
+                  }}>
+                    <strong style={{ color: 'var(--accent-cyan)', display: 'block', marginBottom: '6px', fontSize: '11px', fontWeight: '800' }}>🎯 선호하는 맛집 취향을 선택해 보세요! (첫 로드 최적화)</strong>
+                    <div style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'repeat(3, 1fr)',
+                      gap: '6px'
+                    }}>
+                      {[
+                        { id: '한식', name: '🍜 노포/국밥' },
+                        { id: '육류', name: '🥩 육류/고기' },
+                        { id: '일식', name: '🍣 일식/초밥' },
+                        { id: '중식', name: '🥢 중식/마라' },
+                        { id: '양식', name: '🍕 양식/파스타' },
+                        { id: '전체', name: '🍽️ 전체보기' }
+                      ].map((item) => {
+                        const isSelected = onboardingTaste === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setOnboardingTaste(item.id)}
+                            style={{
+                              padding: '8px 4px',
+                              borderRadius: '6px',
+                              background: isSelected ? 'rgba(6, 182, 212, 0.2)' : 'rgba(255,255,255,0.03)',
+                              border: `1px solid ${isSelected ? 'var(--accent-cyan)' : 'rgba(255,255,255,0.08)'}`,
+                              color: isSelected ? '#ffffff' : '#cbd5e1',
+                              fontSize: '11px',
+                              fontWeight: isSelected ? '800' : '500',
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              boxShadow: isSelected ? '0 0 8px rgba(6, 182, 212, 0.25)' : 'none'
+                            }}
+                          >
+                            {item.name}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
                   
                   <div style={{

@@ -111,6 +111,7 @@ interface DetailPanelProps {
 
 export default function DetailPanel({ restaurant, onClose, isMobile = false }: DetailPanelProps) {
   const [copied, setCopied] = useState(false);
+  const [taxiCopied, setTaxiCopied] = useState(false);
 
   // 1. 단골 등록 (하트) 상태
   const [isFavorite, setIsFavorite] = useState(() => {
@@ -330,6 +331,35 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
       } catch (e) {
         console.error(e);
       }
+    });
+  };
+
+  // 카카오 T 택시 호출 및 주소 복사 연동 핸들러
+  const handleTaxiCallClick = () => {
+    safeCopyToClipboard(restaurant.address).then(() => {
+      setTaxiCopied(true);
+      setTimeout(() => setTaxiCopied(false), 3000);
+
+      alert(`[대동맛지도 안내]\n식당 주소("${restaurant.address}")가 클립보드에 복사되었습니다.\n\n확인 버튼을 누르면 카카오 T 어플로 연결됩니다. 앱이 열리면 목적지 입력창에 '붙여넣기'하여 편하게 택시를 호출해 보세요!`);
+
+      const appUrl = 'kakaot://';
+      const playStoreUrl = 'https://play.google.com/store/apps/details?id=com.kakao.taxi';
+      const appStoreUrl = 'https://apps.apple.com/kr/app/id1035111244';
+
+      const start = Date.now();
+      window.location.href = appUrl;
+
+      setTimeout(() => {
+        if (Date.now() - start < 2000) {
+          if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
+            window.open(appStoreUrl, '_blank');
+          } else {
+            window.open(playStoreUrl, '_blank');
+          }
+        }
+      }, 1500);
+    }).catch((err) => {
+      console.error('Taxi address copy failed:', err);
     });
   };
 
@@ -719,6 +749,41 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
               <>
                 <Copy size={14} />
                 맛집 공유하기
+              </>
+            )}
+          </button>
+
+          <button
+            onClick={handleTaxiCallClick}
+            style={{
+              width: '100%',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
+              border: 'none',
+              color: '#ffffff',
+              borderRadius: '8px',
+              padding: '11px 0',
+              fontSize: isMobile ? '11px' : '13px',
+              fontWeight: '700',
+              cursor: 'pointer',
+              transition: 'opacity 0.2s',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
+            onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
+          >
+            {taxiCopied ? (
+              <>
+                <CheckCircle size={14} style={{ color: '#ffffff' }} />
+                <span>주소 복사 완료 & 카카오 T 호출 중...</span>
+              </>
+            ) : (
+              <>
+                <span style={{ fontSize: '14px' }}>🚕</span>
+                카카오 T 택시 호출 (주소 복사 연동)
               </>
             )}
           </button>
