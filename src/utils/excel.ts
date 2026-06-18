@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx';
 
 export interface RestaurantRaw {
+  id?: string;
   name: string;
   category: string;
   address: string;
@@ -80,6 +81,34 @@ export function downloadSampleExcel() {
   XLSX.writeFile(wb, '대동여맛집지도_샘플.xlsx');
 }
 
+interface ExcelRow {
+  식당상호?: string;
+  상호명?: string;
+  name?: string;
+  음식종류?: string;
+  카테고리?: string;
+  category?: string;
+  주소?: string;
+  address?: string;
+  지역?: string;
+  region?: string;
+  도시명?: string;
+  city?: string;
+  평점?: string | number;
+  rating?: string | number;
+  추천사유?: string;
+  리뷰?: string;
+  review?: string;
+  대표메뉴?: string;
+  menu?: string;
+  '포털 검색명'?: string;
+  portalSearchName?: string;
+  위도?: string | number;
+  latitude?: string | number;
+  경도?: string | number;
+  longitude?: string | number;
+}
+
 /**
  * 업로드된 엑셀 파일을 읽어와 RestaurantRaw 배열 객체로 파싱합니다.
  */
@@ -99,7 +128,7 @@ export function parseExcelFile(file: File): Promise<RestaurantRaw[]> {
         const worksheet = workbook.Sheets[sheetName];
 
         // 엑셀 행을 JSON 객체 배열로 변환
-        const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+        const jsonData = XLSX.utils.sheet_to_json<ExcelRow>(worksheet);
 
         const restaurants: RestaurantRaw[] = jsonData.map((row, idx) => {
           // 컬럼 매핑 (일반 서식 및 전국 맛집 종합본 서식 상호 호환 지원)
@@ -108,30 +137,36 @@ export function parseExcelFile(file: File): Promise<RestaurantRaw[]> {
           
           let address = '';
           if (row['주소'] || row['address']) {
-            address = row['주소'] || row['address'];
+            address = String(row['주소'] || row['address']);
           } else if (row['지역'] && row['도시명']) {
             address = `${row['지역']} ${row['도시명']}`;
           }
 
-          const addressStr = String(address).trim();
+          const addressStr = address.trim();
           const region = row['지역'] || row['region'] || (addressStr ? addressStr.split(' ')[0] : '');
           const city = row['도시명'] || row['city'] || (addressStr ? addressStr.split(' ')[1] : '');
 
-          let rating = parseFloat(row['평점'] || row['rating'] || '4.5'); // 전국맛집본은 별점이 없으므로 기본 4.5 부여
+          let rating = parseFloat(String(row['평점'] || row['rating'] || '4.5')); // 전국맛집본은 별점이 없으므로 기본 4.5 부여
           if (isNaN(rating)) rating = 4.5;
 
           const review = row['추천사유'] || row['리뷰'] || row['review'] || '';
           const menu = row['대표메뉴'] || row['menu'] || '';
           const portalSearchName = row['포털 검색명'] || row['portalSearchName'] || '';
           
-          let latitude = row['위도'] || row['latitude'] ? parseFloat(row['위도'] || row['latitude']) : undefined;
-          let longitude = row['경도'] || row['longitude'] ? parseFloat(row['경도'] || row['longitude']) : undefined;
+          const rawLat = row['위도'] || row['latitude'];
+          const rawLng = row['경도'] || row['longitude'];
+          let latitude = rawLat ? parseFloat(String(rawLat)) : undefined;
+          let longitude = rawLng ? parseFloat(String(rawLng)) : undefined;
 
-          if (isNaN(latitude as number)) latitude = undefined;
-          if (isNaN(longitude as number)) longitude = undefined;
+          if (latitude !== undefined && isNaN(latitude)) latitude = undefined;
+          if (longitude !== undefined && isNaN(longitude)) longitude = undefined;
+
+          const nameTrimmed = String(name).trim();
+          const id = `${nameTrimmed}_${addressStr || idx}`.replace(/\s+/g, '_');
 
           return {
-            name: String(name).trim(),
+            id,
+            name: nameTrimmed,
             category: String(category).trim(),
             address: addressStr,
             rating,

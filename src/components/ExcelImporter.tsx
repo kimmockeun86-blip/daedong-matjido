@@ -6,9 +6,10 @@ import type { RestaurantRaw } from '../utils/excel';
 interface ExcelImporterProps {
   onDataParsed: (data: RestaurantRaw[]) => void;
   geocodingProgress: { current: number; total: number } | null;
+  onLoadDefaultData?: () => void;
 }
 
-export default function ExcelImporter({ onDataParsed, geocodingProgress }: ExcelImporterProps) {
+export default function ExcelImporter({ onDataParsed, geocodingProgress, onLoadDefaultData }: ExcelImporterProps) {
   const [isDragActive, setIsDragActive] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -17,6 +18,7 @@ export default function ExcelImporter({ onDataParsed, geocodingProgress }: Excel
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
+    if (loading || geocodingProgress) return;
     if (e.type === 'dragenter' || e.type === 'dragover') {
       setIsDragActive(true);
     } else if (e.type === 'dragleave') {
@@ -25,7 +27,8 @@ export default function ExcelImporter({ onDataParsed, geocodingProgress }: Excel
   };
 
   const processFile = async (file: File) => {
-    if (!file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+    const fileNameLower = file.name.toLowerCase();
+    if (!fileNameLower.endsWith('.xlsx') && !fileNameLower.endsWith('.xls')) {
       setError('엑셀 파일(.xlsx, .xls)만 업로드할 수 있습니다.');
       return;
     }
@@ -40,7 +43,7 @@ export default function ExcelImporter({ onDataParsed, geocodingProgress }: Excel
       } else {
         onDataParsed(parsedData);
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error(err);
       setError('엑셀 파일을 파싱하는 도중 오류가 발생했습니다.');
     } finally {
@@ -53,18 +56,22 @@ export default function ExcelImporter({ onDataParsed, geocodingProgress }: Excel
     e.stopPropagation();
     setIsDragActive(false);
 
+    if (loading || geocodingProgress) return;
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       await processFile(e.dataTransfer.files[0]);
     }
   };
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (loading || geocodingProgress) return;
     if (e.target.files && e.target.files[0]) {
       await processFile(e.target.files[0]);
     }
   };
 
   const onButtonClick = () => {
+    if (loading || geocodingProgress) return;
     fileInputRef.current?.click();
   };
 
@@ -102,13 +109,14 @@ export default function ExcelImporter({ onDataParsed, geocodingProgress }: Excel
           border: `2px dashed ${isDragActive ? '#06b6d4' : 'rgba(255, 255, 255, 0.15)'}`,
           borderRadius: '12px',
           padding: '40px 20px',
-          cursor: 'pointer',
+          cursor: (loading || geocodingProgress) ? 'not-allowed' : 'pointer',
           background: isDragActive ? 'rgba(6, 182, 212, 0.05)' : 'rgba(30, 41, 59, 0.2)',
           transition: 'all 0.3s ease',
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          gap: '16px'
+          gap: '16px',
+          opacity: (loading || geocodingProgress) ? 0.7 : 1
         }}
       >
         <input
@@ -117,6 +125,7 @@ export default function ExcelImporter({ onDataParsed, geocodingProgress }: Excel
           accept=".xlsx, .xls"
           onChange={handleFileChange}
           style={{ display: 'none' }}
+          disabled={!!(loading || geocodingProgress)}
         />
 
         {loading || geocodingProgress ? (
@@ -175,6 +184,36 @@ export default function ExcelImporter({ onDataParsed, geocodingProgress }: Excel
         }}>
           ⚠️ {error}
         </div>
+      )}
+
+      {onLoadDefaultData && !(loading || geocodingProgress) && (
+        <button
+          onClick={onLoadDefaultData}
+          style={{
+            width: '100%',
+            padding: '14px 0',
+            background: 'linear-gradient(135deg, #f97316 0%, #eab308 100%)',
+            border: 'none',
+            borderRadius: '8px',
+            color: '#020617',
+            fontSize: '14px',
+            fontWeight: '800',
+            cursor: 'pointer',
+            boxShadow: '0 4px 15px rgba(249, 115, 22, 0.25)',
+            transition: 'all 0.2s',
+            marginTop: '4px'
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-1px)';
+            e.currentTarget.style.boxShadow = '0 6px 20px rgba(249, 115, 22, 0.35)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = 'translateY(0)';
+            e.currentTarget.style.boxShadow = '0 4px 15px rgba(249, 115, 22, 0.25)';
+          }}
+        >
+          🌟 7년 실방문 대동맛지도 기본 맛집(824곳) 바로 둘러보기
+        </button>
       )}
 
       {/* Sample Download Area */}

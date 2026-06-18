@@ -1,7 +1,41 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, MapPin, Compass, Navigation, BarChart3, X } from 'lucide-react';
 import type { RestaurantRaw } from '../utils/excel';
 import L from 'leaflet';
+
+const safeCopyToClipboard = (text: string): Promise<void> => {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise<void>((resolve, reject) => {
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.top = '0';
+      textArea.style.left = '0';
+      textArea.style.width = '2em';
+      textArea.style.height = '2em';
+      textArea.style.padding = '0';
+      textArea.style.border = 'none';
+      textArea.style.outline = 'none';
+      textArea.style.boxShadow = 'none';
+      textArea.style.background = 'transparent';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      if (successful) {
+        resolve();
+      } else {
+        reject(new Error('Fallback copy failed'));
+      }
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
 
 interface SidebarProps {
   restaurants: RestaurantRaw[];
@@ -18,6 +52,9 @@ interface SidebarProps {
   onGPSClick: () => void; // GPS 버튼 클릭 핸들러
   isMobile?: boolean;
   mapRef: React.MutableRefObject<L.Map | null>;
+  unlockProgress: { shares: number; logs: number; isUnlocked: boolean };
+  top10Ids: string[];
+  onOpenToolkitTab?: (tab: 'roulette' | 'mbti' | 'couple' | 'worldcup' | 'share' | 'instagram' | 'shop' | 'course' | 'quiz') => void;
 }
 
 // 카테고리별 아이콘 배지 매핑
@@ -46,9 +83,45 @@ export default function Sidebar({
   onResetData,
   onGPSClick,
   isMobile = false,
-  mapRef
+  mapRef,
+  unlockProgress,
+  top10Ids,
+  onOpenToolkitTab
 }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+
+  const [showUnlockModal, setShowUnlockModal] = useState(false);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Bug 7: invalidateSize on collapse/expand transition or resize
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (mapRef.current) {
+        mapRef.current.invalidateSize({ animate: true });
+      }
+    }, 350);
+    return () => clearTimeout(timer);
+  }, [isCollapsed, isMobile, mapRef]);
+
+  // Bug 8: disableScrollPropagation & disableClickPropagation on Sidebar
+  useEffect(() => {
+    const container = containerRef.current;
+    if (container) {
+      L.DomEvent.disableScrollPropagation(container);
+      L.DomEvent.disableClickPropagation(container);
+    }
+  }, []);
+
+  // Bug 32: Listen for custom event to trigger unlock modal from deep link block
+  useEffect(() => {
+    const handleShowUnlock = () => {
+      setShowUnlockModal(true);
+    };
+    window.addEventListener('daedong_show_unlock_modal', handleShowUnlock);
+    return () => {
+      window.removeEventListener('daedong_show_unlock_modal', handleShowUnlock);
+    };
+  }, []);
 
   // 1. 맛집 제보 모달 상태
   const [showReportModal, setShowReportModal] = useState(false);
@@ -60,6 +133,7 @@ export default function Sidebar({
 
   // 2. 지하철역 중간지점 탐색 상태
   const [showStationSearch, setShowStationSearch] = useState(false);
+  const [showToolkitSection, setShowToolkitSection] = useState(true);
   const [station1, setStation1] = useState('');
   const [station2, setStation2] = useState('');
 
@@ -88,31 +162,49 @@ export default function Sidebar({
     const term1 = station1.trim().toLowerCase();
     const term2 = station2.trim().toLowerCase();
 
-    const matches = restaurants.filter(r => 
-      r.address.toLowerCase().includes(term1) || r.address.toLowerCase().includes(term2)
-    );
+    const matches1 = restaurants.filter(r => r.address.toLowerCase().includes(term1));
+    const matches2 = restaurants.filter(r => r.address.toLowerCase().includes(term2));
 
-    if (matches.length === 0) {
-      alert('해당 장소 근처에 등록된 맛집이 없습니다. 다른 역명을 입력해 보세요 (예: 강남, 마포, 강릉 등).');
+    if (matches1.length === 0 || matches2.length === 0) {
+      alert('두 출발지 모두 근처에 맛집이 있어야 중간 지점을 찾을 수 있습니다. 두 출발지 각각의 맛집을 찾을 수 있는 지역명(예: 서울, 강릉, 부산 등)을 정확히 입력해 주세요.');
       return;
     }
 
-    let sumLat = 0;
-    let sumLng = 0;
-    let count = 0;
-    matches.forEach(r => {
+    let sumLat1 = 0, sumLng1 = 0, count1 = 0;
+    matches1.forEach(r => {
       if (r.latitude && r.longitude) {
-        sumLat += r.latitude;
-        sumLng += r.longitude;
-        count++;
+        sumLat1 += r.latitude;
+        sumLng1 += r.longitude;
+        count1++;
       }
     });
 
-    if (count > 0 && mapRef.current) {
-      const avgLat = sumLat / count;
-      const avgLng = sumLng / count;
-      mapRef.current.setView([avgLat, avgLng], 13, { animate: true, duration: 1.0 });
-      alert(`두 지역 매칭 완료! 중간 영역 맛집 ${count}곳 근처로 지도 시점이 이동되었습니다.`);
+    let sumLat2 = 0, sumLng2 = 0, count2 = 0;
+    matches2.forEach(r => {
+      if (r.latitude && r.longitude) {
+        sumLat2 += r.latitude;
+        sumLng2 += r.longitude;
+        count2++;
+      }
+    });
+
+    if (count1 === 0 || count2 === 0) {
+      alert('두 출발지 근처 맛집 중 위도/경도 좌표가 존재하는 식당이 부족하여 연산할 수 없습니다.');
+      return;
+    }
+
+    const avgLat1 = sumLat1 / count1;
+    const avgLng1 = sumLng1 / count1;
+
+    const avgLat2 = sumLat2 / count2;
+    const avgLng2 = sumLng2 / count2;
+
+    const midpointLat = (avgLat1 + avgLat2) / 2;
+    const midpointLng = (avgLng1 + avgLng2) / 2;
+
+    if (mapRef.current) {
+      mapRef.current.setView([midpointLat, midpointLng], 11, { animate: true, duration: 1.2 });
+      alert(`두 지역 매칭 완료! 양측 대표 맛집들의 1:1 정중앙 지점(위도: ${midpointLat.toFixed(4)}, 경도: ${midpointLng.toFixed(4)})으로 지도 시점이 이동되었습니다.`);
     }
   };
 
@@ -120,19 +212,22 @@ export default function Sidebar({
   const categories = ['전체', '한식', '중식', '일식', '양식', '분식', '육류'];
 
   // 동적 지역별 분포 계산
-  const regionMap: Record<string, number> = {};
-  restaurants.forEach((r) => {
-    if (r.region) {
-      regionMap[r.region] = (regionMap[r.region] || 0) + 1;
-    }
-  });
+  const regionsSorted = useMemo(() => {
+    const regionMap: Record<string, number> = {};
+    restaurants.forEach((r) => {
+      if (r.region) {
+        regionMap[r.region] = (regionMap[r.region] || 0) + 1;
+      }
+    });
 
-  const regionsSorted = Object.entries(regionMap)
-    .map(([name, count]) => ({ name, count }))
-    .sort((a, b) => b.count - a.count);
+    return Object.entries(regionMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [restaurants]);
 
   return (
     <div 
+      ref={containerRef}
       className="glass-panel"
       style={{
         position: 'absolute',
@@ -164,6 +259,7 @@ export default function Sidebar({
             borderRadius: '0 8px 8px 0',
             background: 'var(--bg-glass)',
             backdropFilter: 'blur(10px)',
+            WebkitBackdropFilter: 'blur(10px)',
             border: '1px solid var(--border-glass)',
             borderLeft: 'none',
             display: 'flex',
@@ -430,96 +526,131 @@ export default function Sidebar({
             )}
           </div>
 
-          {/* 카테고리 필터 (뱃지 스타일) */}
-          <div style={{
-            display: 'flex',
-            flexWrap: 'wrap',
-            gap: '6px',
-            width: '100%'
-          }}>
-            {categories.map((cat, idx) => {
-              const isActive = selectedCategory === cat;
-              const emoji = CATEGORY_EMOJIS[cat] || '🍽️';
-              return (
-                <button
-                  key={idx}
-                  onClick={() => setSelectedCategory(cat)}
+          {/* 카테고리 & 지역 필터 (모바일에서는 콤팩트 select 콤보박스로 1열 정렬, 데스크톱에서는 기존의 뱃지 레이아웃) */}
+          {isMobile ? (
+            <div style={{ display: 'flex', gap: '8px', width: '100%', flexShrink: 0 }}>
+              {/* 카테고리 셀렉트 */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '10px', fontWeight: '800', color: 'var(--accent-yellow)', letterSpacing: '0.05em' }}>음식 카테고리</label>
+                <select
+                  value={selectedCategory}
+                  onChange={(e) => setSelectedCategory(e.target.value)}
                   style={{
-                    whiteSpace: 'nowrap',
-                    padding: '7px 13px',
+                    width: '100%',
+                    padding: '10px',
+                    background: 'rgba(15, 23, 42, 0.75)',
+                    border: '1.5px solid var(--accent-yellow)',
                     borderRadius: '8px',
-                    border: '1px solid',
-                    borderColor: isActive ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.06)',
-                    background: isActive ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.03)',
-                    color: isActive ? '#0f172a' : 'var(--text-secondary)',
+                    color: '#fff',
                     fontSize: '12px',
                     fontWeight: '700',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s',
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '4px'
+                    outline: 'none',
+                    boxShadow: '0 0 10px rgba(234, 179, 8, 0.1)',
+                    cursor: 'pointer'
                   }}
                 >
-                  <span>{emoji}</span>
-                  <span>{cat}</span>
-                </button>
-              );
-            })}
-          </div>
+                  {categories.map((cat, idx) => (
+                    <option key={idx} value={cat} style={{ background: '#0f172a', color: '#fff' }}>
+                      {(CATEGORY_EMOJIS[cat] || '🍽️') + ' ' + cat}
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-          {/* 지역별 맛도리 분포 필터 버튼 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <Compass size={12} style={{ color: 'var(--accent-cyan)' }} />
-              지역별 맛도리 분포
+              {/* 지역 셀렉트 */}
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <label style={{ fontSize: '10px', fontWeight: '800', color: 'var(--accent-cyan)', letterSpacing: '0.05em' }}>지역 분포 필터</label>
+                <select
+                  value={selectedRegion}
+                  onChange={(e) => setSelectedRegion(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    background: 'rgba(15, 23, 42, 0.75)',
+                    border: '1.5px solid var(--accent-cyan)',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    outline: 'none',
+                    boxShadow: '0 0 10px rgba(6, 182, 212, 0.1)',
+                    cursor: 'pointer'
+                  }}
+                >
+                  <option value="전체" style={{ background: '#0f172a', color: '#fff' }}>
+                    전체 ({restaurants.length})
+                  </option>
+                  {regionsSorted.map((reg, idx) => (
+                    <option key={idx} value={reg.name} style={{ background: '#0f172a', color: '#fff' }}>
+                      {reg.name} ({reg.count})
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
-            <div style={{ 
-              display: 'flex', 
-              gap: '6px', 
-              flexWrap: 'wrap', 
-              paddingBottom: '2px' 
-            }}>
-              {/* 전체 지역 지역 버튼 */}
-              <button
-                onClick={() => setSelectedRegion('전체')}
-                style={{
-                  whiteSpace: 'nowrap',
-                  padding: '6px 10px',
-                  borderRadius: '6px',
-                  border: '1px solid',
-                  borderColor: selectedRegion === '전체' ? 'var(--accent-cyan)' : 'rgba(255,255,255,0.04)',
-                  background: selectedRegion === '전체' ? 'rgba(6, 182, 212, 0.12)' : 'rgba(255,255,255,0.02)',
-                  color: selectedRegion === '전체' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-                  fontSize: '11px',
-                  fontWeight: '600',
-                  cursor: 'pointer',
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px'
-                }}
-              >
-                <span>전체</span>
-                <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '4px', color: '#94a3b8' }}>
-                  {restaurants.length}
-                </span>
-              </button>
+          ) : (
+            <>
+              {/* 카테고리 필터 (뱃지 스타일) */}
+              <div style={{
+                display: 'flex',
+                flexWrap: 'wrap',
+                gap: '6px',
+                width: '100%'
+              }}>
+                {categories.map((cat, idx) => {
+                  const isActive = selectedCategory === cat;
+                  const emoji = CATEGORY_EMOJIS[cat] || '🍽️';
+                  return (
+                    <button
+                      key={idx}
+                      onClick={() => setSelectedCategory(cat)}
+                      style={{
+                        whiteSpace: 'nowrap',
+                        padding: '7px 13px',
+                        borderRadius: '8px',
+                        border: '1px solid',
+                        borderColor: isActive ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.06)',
+                        background: isActive ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.03)',
+                        color: isActive ? '#0f172a' : 'var(--text-secondary)',
+                        fontSize: '12px',
+                        fontWeight: '700',
+                        cursor: 'pointer',
+                        transition: 'all 0.2s',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <span>{emoji}</span>
+                      <span>{cat}</span>
+                    </button>
+                  );
+                })}
+              </div>
 
-              {/* 정렬된 지역 버튼 렌더링 */}
-              {regionsSorted.map((reg, idx) => {
-                const isActive = selectedRegion === reg.name;
-                return (
+              {/* 지역별 맛도리 분포 필터 버튼 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <Compass size={12} style={{ color: 'var(--accent-cyan)' }} />
+                  지역별 맛도리 분포
+                </div>
+                <div style={{ 
+                  display: 'flex', 
+                  gap: '6px', 
+                  flexWrap: 'wrap', 
+                  paddingBottom: '2px' 
+                }}>
+                  {/* 전체 지역 지역 버튼 */}
                   <button
-                    key={idx}
-                    onClick={() => setSelectedRegion(reg.name)}
+                    onClick={() => setSelectedRegion('전체')}
                     style={{
                       whiteSpace: 'nowrap',
                       padding: '6px 10px',
                       borderRadius: '6px',
                       border: '1px solid',
-                      borderColor: isActive ? 'var(--accent-cyan)' : 'rgba(255,255,255,0.04)',
-                      background: isActive ? 'rgba(6, 182, 212, 0.12)' : 'rgba(255,255,255,0.02)',
-                      color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                      borderColor: selectedRegion === '전체' ? 'var(--accent-cyan)' : 'rgba(255,255,255,0.04)',
+                      background: selectedRegion === '전체' ? 'rgba(6, 182, 212, 0.12)' : 'rgba(255,255,255,0.02)',
+                      color: selectedRegion === '전체' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
                       fontSize: '11px',
                       fontWeight: '600',
                       cursor: 'pointer',
@@ -528,15 +659,46 @@ export default function Sidebar({
                       gap: '4px'
                     }}
                   >
-                    <span>{reg.name}</span>
+                    <span>전체</span>
                     <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '4px', color: '#94a3b8' }}>
-                      {reg.count}
+                      {restaurants.length}
                     </span>
                   </button>
-                );
-              })}
-            </div>
-          </div>
+
+                  {/* 정렬된 지역 버튼 렌더링 */}
+                  {regionsSorted.map((reg, idx) => {
+                    const isActive = selectedRegion === reg.name;
+                    return (
+                      <button
+                        key={idx}
+                        onClick={() => setSelectedRegion(reg.name)}
+                        style={{
+                          whiteSpace: 'nowrap',
+                          padding: '6px 10px',
+                          borderRadius: '6px',
+                          border: '1px solid',
+                          borderColor: isActive ? 'var(--accent-cyan)' : 'rgba(255,255,255,0.04)',
+                          background: isActive ? 'rgba(6, 182, 212, 0.12)' : 'rgba(255,255,255,0.02)',
+                          color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                          fontSize: '11px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <span>{reg.name}</span>
+                        <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '4px', color: '#94a3b8' }}>
+                          {reg.count}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </>
+          ) }
 
           {/* 전체 분석 리포트 카드 */}
           <div style={{
@@ -586,6 +748,93 @@ export default function Sidebar({
             </div>
           </div>
 
+          {/* 🎮 미식 툴킷 즐길거리 (Interactive Tools) */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
+            <button
+              onClick={() => setShowToolkitSection(!showToolkitSection)}
+              style={{
+                width: '100%',
+                background: 'linear-gradient(90deg, rgba(6, 182, 212, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+                border: '1px solid rgba(6, 182, 212, 0.35)',
+                color: '#f8fafc',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                fontSize: '13px',
+                fontWeight: '800',
+                cursor: 'pointer',
+                textAlign: 'left',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                boxShadow: '0 0 10px rgba(6, 182, 212, 0.1)'
+              }}
+            >
+              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                🎮 대동맛지도 미식 툴킷 <span style={{ fontSize: '10px', fontWeight: '500', color: 'var(--accent-cyan)' }}>INTERACTIVE</span>
+              </span>
+              <span>{showToolkitSection ? '▼' : '▶'}</span>
+            </button>
+
+            {showToolkitSection && (
+              <div 
+                className="animate-fade-in"
+                style={{
+                  background: 'rgba(15, 23, 42, 0.45)',
+                  border: '1px solid var(--border-glass)',
+                  padding: '12px',
+                  borderRadius: '10px',
+                  display: 'grid',
+                  gridTemplateColumns: 'repeat(2, 1fr)',
+                  gap: '8px'
+                }}
+              >
+                {([
+                  { id: 'roulette', name: '맛집 룰렛', icon: '🎯', desc: '결정장애 해소' },
+                  { id: 'mbti', name: '미식 MBTI', icon: '🧠', desc: '스와이프 성향분석' },
+                  { id: 'couple', name: '커플 궁합', icon: '👩‍❤️‍👨', desc: '데이트 식당 매칭' },
+                  { id: 'worldcup', name: '이상형 월드컵', icon: '🏆', desc: '최애 노포 8강전' },
+                  { id: 'share', name: '약속 메이커', icon: '💬', desc: '초대장 공유' },
+                  { id: 'instagram', name: '인스타 카드', icon: '📸', desc: '인증서&Wrapped' },
+                  { id: 'quiz', name: '미식 퀴즈', icon: '✏️', desc: '역사 맞추기' },
+                  { id: 'shop', name: '기프트 샵', icon: '🎁', desc: '대동 굿즈' }
+                ] as const).map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => onOpenToolkitTab?.(item.id)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      background: 'rgba(30, 41, 59, 0.4)',
+                      border: '1px solid rgba(255,255,255,0.04)',
+                      borderRadius: '8px',
+                      padding: '8px 10px',
+                      cursor: 'pointer',
+                      textAlign: 'left',
+                      transition: 'all 0.2s'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.borderColor = 'var(--accent-cyan)';
+                      e.currentTarget.style.background = 'rgba(6, 182, 212, 0.05)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
+                      e.currentTarget.style.background = 'rgba(30, 41, 59, 0.4)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    <span style={{ fontSize: '20px' }}>{item.icon}</span>
+                    <div style={{ display: 'flex', flexDirection: 'column' }}>
+                      <span style={{ fontSize: '11px', fontWeight: '800', color: '#f8fafc' }}>{item.name}</span>
+                      <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>{item.desc}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* 검색 결과 카운트 정보 */}
           <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
             검색된 맛집 <span style={{ color: 'var(--accent-yellow)' }}>{filteredRestaurants.length}</span>개
@@ -600,142 +849,219 @@ export default function Sidebar({
             gap: '12px',
             paddingRight: '4px'
           }}>
+            {/* Top 10 Featured Collection */}
+            <div style={{
+              background: 'rgba(236, 72, 153, 0.05)',
+              border: '1.5px solid var(--accent-pink)',
+              borderRadius: '12px',
+              padding: '16px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+              boxShadow: '0 0 15px rgba(236, 72, 153, 0.15)',
+              flexShrink: 0
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={{ fontSize: '13px', fontWeight: '800', color: 'var(--accent-pink)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span>👑 대동맛지도 전국 Top 10 인기 노포</span>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                {top10Ids
+                  .map(id => restaurants.find(r => r.id === id))
+                  .filter((res): res is RestaurantRaw => !!res)
+                  .map((res, idx) => (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        if (!unlockProgress.isUnlocked) {
+                          setShowUnlockModal(true);
+                        } else {
+                          onSelectRestaurant(res);
+                        }
+                      }}
+                      style={{
+                        padding: '10px',
+                        borderRadius: '8px',
+                        background: 'rgba(30, 41, 59, 0.35)',
+                        border: '1px solid rgba(255,255,255,0.04)',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--accent-pink)';
+                        e.currentTarget.style.background = 'rgba(30, 41, 59, 0.55)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.04)';
+                        e.currentTarget.style.background = 'rgba(30, 41, 59, 0.35)';
+                      }}
+                    >
+                      <span style={{ fontSize: '12px', color: '#cbd5e1', fontWeight: '600' }}>
+                        {idx + 1}. {res.name}
+                      </span>
+                      <span style={{ fontSize: '10px', color: 'var(--accent-pink)', fontWeight: '700', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {!unlockProgress.isUnlocked && <span>🔒</span>}
+                        {res.category} | {res.region || '전국'}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
             {filteredRestaurants.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: '13px' }}>
                 🔍 조건에 일치하는 맛집이 없습니다.
               </div>
             ) : (
-              filteredRestaurants.map((res, idx) => {
-                const isSelected = selectedRestaurant?.name === res.name;
-                
-                // 음식 종류에 따라 배지 컬러 지정
-                let badgeBg = 'rgba(249, 115, 22, 0.1)';
-                let badgeColor = 'var(--accent-orange)';
-                if (res.category === '일식') {
-                  badgeBg = 'rgba(59, 130, 246, 0.1)';
-                  badgeColor = 'var(--accent-blue)';
-                } else if (res.category === '중식') {
-                  badgeBg = 'rgba(139, 92, 246, 0.1)';
-                  badgeColor = 'var(--accent-purple)';
-                } else if (res.category === '양식') {
-                  badgeBg = 'rgba(16, 185, 129, 0.1)';
-                  badgeColor = 'var(--accent-green)';
-                } else if (res.category === '분식') {
-                  badgeBg = 'rgba(236, 72, 153, 0.1)';
-                  badgeColor = 'var(--accent-pink)';
-                }
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' }}>
+                {filteredRestaurants.map((res, idx) => {
+                  const isLockedItem = !unlockProgress.isUnlocked && idx >= 5;
+                  const isSelected = selectedRestaurant?.id === res.id;
+                  
+                  // 음식 종류에 따라 배지 컬러 지정
+                  let badgeBg = 'rgba(249, 115, 22, 0.1)';
+                  let badgeColor = 'var(--accent-orange)';
+                  if (res.category === '일식') {
+                    badgeBg = 'rgba(59, 130, 246, 0.1)';
+                    badgeColor = 'var(--accent-blue)';
+                  } else if (res.category === '중식') {
+                    badgeBg = 'rgba(139, 92, 246, 0.1)';
+                    badgeColor = 'var(--accent-purple)';
+                  } else if (res.category === '양식') {
+                    badgeBg = 'rgba(16, 185, 129, 0.1)';
+                    badgeColor = 'var(--accent-green)';
+                  } else if (res.category === '분식') {
+                    badgeBg = 'rgba(236, 72, 153, 0.1)';
+                    badgeColor = 'var(--accent-pink)';
+                  }
 
-                return (
-                  <div
-                    key={idx}
-                    onClick={() => onSelectRestaurant(res)}
-                    style={{
-                      padding: '16px',
-                      borderRadius: '12px',
-                      background: isSelected ? 'rgba(6, 182, 212, 0.08)' : 'rgba(30, 41, 59, 0.35)',
-                      border: `1.5px solid ${isSelected ? 'var(--accent-cyan)' : 'rgba(255, 255, 255, 0.04)'}`,
-                      cursor: 'pointer',
-                      transition: 'all 0.25s',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: '10px'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
-                        e.currentTarget.style.background = 'rgba(30, 41, 59, 0.5)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (!isSelected) {
-                        e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.04)';
-                        e.currentTarget.style.background = 'rgba(30, 41, 59, 0.35)';
-                      }
-                    }}
-                  >
-                    {/* 카드 헤더 (음식종류, 상호명, 주소) */}
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '70%' }}>
+                  return (
+                    <div
+                      key={idx}
+                      onClick={() => {
+                        if (isLockedItem) {
+                          setShowUnlockModal(true);
+                        } else {
+                          onSelectRestaurant(res);
+                        }
+                      }}
+                      style={{
+                        padding: '16px',
+                        borderRadius: '12px',
+                        background: isSelected ? 'rgba(6, 182, 212, 0.08)' : 'rgba(30, 41, 59, 0.35)',
+                        border: `1.5px solid ${isSelected ? 'var(--accent-cyan)' : 'rgba(255, 255, 255, 0.04)'}`,
+                        cursor: 'pointer',
+                        transition: 'all 0.25s',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                        filter: isLockedItem ? 'blur(4.5px)' : 'none',
+                        opacity: isLockedItem ? 0.5 : 1,
+                        userSelect: isLockedItem ? 'none' : 'auto'
+                      }}
+                      onMouseEnter={(e) => {
+                        if (isLockedItem) return;
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                          e.currentTarget.style.background = 'rgba(30, 41, 59, 0.5)';
+                        }
+                      }}
+                      onMouseLeave={(e) => {
+                        if (isLockedItem) return;
+                        if (!isSelected) {
+                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.04)';
+                          e.currentTarget.style.background = 'rgba(30, 41, 59, 0.35)';
+                        }
+                      }}
+                    >
+                      {/* 카드 헤더 (음식종류, 상호명, 주소) */}
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '70%' }}>
+                          <span style={{
+                            fontSize: '10px',
+                            fontWeight: '800',
+                            padding: '2px 6px',
+                            borderRadius: '4px',
+                            background: badgeBg,
+                            color: badgeColor
+                          }}>
+                            {res.category}
+                          </span>
+                          <span style={{ fontSize: '15px', fontWeight: '800', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {res.name}
+                          </span>
+                        </div>
+                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                          <MapPin size={10} />
+                          {res.address}
+                        </span>
+                      </div>
+
+                      {/* 대표메뉴 */}
+                      {res.menu && (
+                        <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent-cyan)' }}>
+                          대표메뉴: <span style={{ color: '#f8fafc', fontWeight: '500' }}>{res.menu}</span>
+                        </div>
+                      )}
+
+                      {/* 추천사유 본문 */}
+                      {res.review && (
+                        <p style={{
+                          fontSize: '12px',
+                          color: 'var(--text-secondary)',
+                          lineHeight: '1.4',
+                          display: '-webkit-box',
+                          WebkitLineClamp: 3,
+                          WebkitBoxOrient: 'vertical',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis'
+                        }}>
+                          {res.review}
+                        </p>
+                      )}
+
+                      {/* 네온 하단 태그 */}
+                      <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
                         <span style={{
-                          fontSize: '10px',
-                          fontWeight: '800',
+                          fontSize: '9px',
+                          fontWeight: '700',
                           padding: '2px 6px',
                           borderRadius: '4px',
-                          background: badgeBg,
-                          color: badgeColor
+                          border: '1px solid rgba(16, 185, 129, 0.25)',
+                          background: 'rgba(16, 185, 129, 0.04)',
+                          color: 'var(--accent-green)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px'
                         }}>
-                          {res.category}
+                          <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--accent-green)' }}></span>
+                          지도 핀 활성화
                         </span>
-                        <span style={{ fontSize: '15px', fontWeight: '800', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                          {res.name}
+                        <span style={{
+                          fontSize: '9px',
+                          fontWeight: '700',
+                          padding: '2px 6px',
+                          borderRadius: '4px',
+                          border: '1px solid rgba(139, 92, 246, 0.25)',
+                          background: 'rgba(139, 92, 246, 0.04)',
+                          color: 'var(--accent-purple)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '3px'
+                        }}>
+                          <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--accent-purple)' }}></span>
+                          실사진 보유
                         </span>
                       </div>
-                      <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
-                        <MapPin size={10} />
-                        {res.address}
-                      </span>
+
                     </div>
-
-                    {/* 대표메뉴 */}
-                    {res.menu && (
-                      <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent-cyan)' }}>
-                        대표메뉴: <span style={{ color: '#f8fafc', fontWeight: '500' }}>{res.menu}</span>
-                      </div>
-                    )}
-
-                    {/* 추천사유 본문 */}
-                    {res.review && (
-                      <p style={{
-                        fontSize: '12px',
-                        color: 'var(--text-secondary)',
-                        lineHeight: '1.4',
-                        display: '-webkit-box',
-                        WebkitLineClamp: 3,
-                        WebkitBoxOrient: 'vertical',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis'
-                      }}>
-                        {res.review}
-                      </p>
-                    )}
-
-                    {/* 네온 하단 태그 */}
-                    <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
-                      <span style={{
-                        fontSize: '9px',
-                        fontWeight: '700',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        border: '1px solid rgba(16, 185, 129, 0.25)',
-                        background: 'rgba(16, 185, 129, 0.04)',
-                        color: 'var(--accent-green)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px'
-                      }}>
-                        <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--accent-green)' }}></span>
-                        지도 핀 활성화
-                      </span>
-                      <span style={{
-                        fontSize: '9px',
-                        fontWeight: '700',
-                        padding: '2px 6px',
-                        borderRadius: '4px',
-                        border: '1px solid rgba(139, 92, 246, 0.25)',
-                        background: 'rgba(139, 92, 246, 0.04)',
-                        color: 'var(--accent-purple)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '3px'
-                      }}>
-                        <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--accent-purple)' }}></span>
-                        실사진 보유
-                      </span>
-                    </div>
-
-                  </div>
-                );
-              })
+                  );
+                })}
+              </div>
             )}
           </div>
         </div>
@@ -751,6 +1077,7 @@ export default function Sidebar({
           bottom: 0,
           background: 'rgba(2, 6, 17, 0.85)',
           backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           zIndex: 9999,
           display: 'flex',
           justifyContent: 'center',
@@ -842,6 +1169,113 @@ export default function Sidebar({
                 </button>
               </form>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* 시크릿 컬렉션 해금 모달 */}
+      {showUnlockModal && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(2, 6, 17, 0.85)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
+          zIndex: 9999,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '20px'
+        }} className="animate-fade-in">
+          <div style={{
+            width: '100%',
+            maxWidth: '360px',
+            background: 'var(--bg-secondary)',
+            border: '1.5px solid var(--accent-pink)',
+            borderRadius: '12px',
+            padding: '24px',
+            position: 'relative',
+            boxShadow: '0 0 25px rgba(236, 72, 153, 0.2)'
+          }}>
+            <button 
+              onClick={() => setShowUnlockModal(false)}
+              style={{ position: 'absolute', top: '16px', right: '16px', background: 'transparent', border: 'none', color: '#cbd5e1', cursor: 'pointer' }}
+            >
+              <X size={16} />
+            </button>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+              <div style={{ textAlign: 'center', marginBottom: '4px' }}>
+                <h4 style={{ fontSize: '20px', fontWeight: '900', color: '#f8fafc', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px' }}>
+                  🔒 시크릿 컬렉션 해금
+                </h4>
+                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: '1.4' }}>
+                  7년간 직접 발로 뛰어 발굴한 진짜 희소성 높은 전국 Top 10 최고의 노포 목록의 정보와 지도 위치를 해금합니다.
+                </p>
+              </div>
+
+              <div style={{
+                background: 'rgba(255, 255, 255, 0.02)',
+                border: '1px solid rgba(255, 255, 255, 0.05)',
+                borderRadius: '8px',
+                padding: '12px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px'
+              }}>
+                <div style={{ fontSize: '12px', fontWeight: '700', color: '#f8fafc' }}>
+                  해금 요구 조건 (택 1):
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>💬 단톡방 친구 초대 (공유)</span>
+                  <span style={{ fontWeight: '700', color: unlockProgress.shares >= 3 ? 'var(--accent-green)' : 'var(--accent-pink)' }}>
+                    {unlockProgress.shares} / 3회 {unlockProgress.shares >= 3 && '✓'}
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
+                  <span style={{ color: 'var(--text-secondary)' }}>✍️ 미식 일기 작성 (방문 완료)</span>
+                  <span style={{ fontWeight: '700', color: unlockProgress.logs >= 2 ? 'var(--accent-green)' : 'var(--accent-pink)' }}>
+                    {unlockProgress.logs} / 2회 {unlockProgress.logs >= 2 && '✓'}
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => {
+                  const text = `[대동맛지도 초대장]\n7년간 직접 발로 뛴 전국 백년노포 대공개! 지금 대동맛지도에서 확인해보세요.\n링크: ${window.location.origin}`;
+                  safeCopyToClipboard(text).then(() => {
+                    alert('초대장 문구가 복사되었습니다! 친구나 단톡방에 공유해 보세요.');
+                    try {
+                      const shares = parseInt(localStorage.getItem('daedong_share_count') || '0', 10);
+                      localStorage.setItem('daedong_share_count', String(shares + 1));
+                      window.dispatchEvent(new Event('daedong_unlock_progress'));
+                    } catch (e) {
+                      console.error(e);
+                    }
+                  });
+                }}
+                style={{
+                  width: '100%',
+                  padding: '12px 0',
+                  background: 'linear-gradient(90deg, var(--accent-pink) 0%, var(--accent-purple) 100%)',
+                  color: '#ffffff',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '13px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  boxShadow: '0 0 15px rgba(236, 72, 153, 0.3)',
+                  transition: 'transform 0.2s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+              >
+                💬 단톡방 공유용 초대장 복사하기
+              </button>
+            </div>
           </div>
         </div>
       )}

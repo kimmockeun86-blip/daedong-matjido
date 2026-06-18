@@ -21,6 +21,7 @@
   --accent-green: #10b981;
   --accent-pink: #ec4899;
   --accent-purple: #8b5cf6;
+  --accent-gradient: linear-gradient(90deg, var(--accent-pink) 0%, var(--accent-cyan) 100%);
   
   color-scheme: dark;
   background-color: var(--bg-primary);
@@ -35,6 +36,8 @@
 
 body, html, #root {
   height: 100%;
+  height: 100vh;
+  height: 100dvh;
   width: 100%;
   overflow: hidden;
   background-color: var(--bg-primary);
@@ -130,6 +133,7 @@ body, html, #root {
 .leaflet-popup-content-wrapper {
   background: rgba(15, 23, 42, 0.95) !important;
   backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   border: 1px solid var(--border-glass) !important;
   border-radius: 12px !important;
   color: var(--text-primary) !important;

@@ -1,8 +1,43 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { X, MapPin, Phone, Award, Navigation, Share2, Copy, CheckCircle, Heart, Calculator, Sparkles } from 'lucide-react';
 import type { RestaurantRaw } from '../utils/excel';
+import L from 'leaflet';
 
 // 카테고리별 프리미엄 Unsplash 음식 이미지 컬렉션 (다양성을 위해 해시 매핑)
+const safeCopyToClipboard = (text: string): Promise<void> => {
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    return navigator.clipboard.writeText(text);
+  }
+  return new Promise<void>((resolve, reject) => {
+    try {
+      const textArea = document.createElement('textarea');
+      textArea.value = text;
+      textArea.style.position = 'fixed';
+      textArea.style.top = '0';
+      textArea.style.left = '0';
+      textArea.style.width = '2em';
+      textArea.style.height = '2em';
+      textArea.style.padding = '0';
+      textArea.style.border = 'none';
+      textArea.style.outline = 'none';
+      textArea.style.boxShadow = 'none';
+      textArea.style.background = 'transparent';
+      document.body.appendChild(textArea);
+      textArea.focus();
+      textArea.select();
+      const successful = document.execCommand('copy');
+      document.body.removeChild(textArea);
+      if (successful) {
+        resolve();
+      } else {
+        reject(new Error('Fallback copy failed'));
+      }
+    } catch (err) {
+      reject(err);
+    }
+  });
+};
+
 const CATEGORY_IMAGES: Record<string, string[]> = {
   '한식': [
     'https://images.unsplash.com/photo-1596797038530-2c107229654b?w=600&auto=format&fit=crop', // 비빔밥
@@ -78,7 +113,17 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
   const [copied, setCopied] = useState(false);
 
   // 1. 단골 등록 (하트) 상태
-  const [isFavorite, setIsFavorite] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(() => {
+    if (!restaurant) return false;
+    let favs: string[] = [];
+    try {
+      const item = localStorage.getItem('daedong_favorites');
+      if (item) favs = JSON.parse(item);
+    } catch (e) {
+      console.error(e);
+    }
+    return favs.includes(restaurant.id || '') || favs.includes(restaurant.name);
+  });
 
   // 2. 더치페이 계산기 상태
   const [totalAmount, setTotalAmount] = useState('');
@@ -88,32 +133,28 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
   // 3. 미식 일기 상태
   const [diaryDate, setDiaryDate] = useState('');
   const [diaryNotes, setDiaryNotes] = useState('');
-  const [savedLogs, setSavedLogs] = useState<{ date: string; note: string }[]>([]);
+  const [savedLogs, setSavedLogs] = useState<{ date: string; note: string }[]>(() => {
+    if (!restaurant) return [];
+    let allLogs: Record<string, { date: string; note: string }[]> = {};
+    try {
+      const item = localStorage.getItem('daedong_diary');
+      if (item) allLogs = JSON.parse(item);
+    } catch (e) {
+      console.error(e);
+    }
+    const restaurantKey = restaurant.id || restaurant.name;
+    return allLogs[restaurantKey] || allLogs[restaurant.name] || [];
+  });
 
-  // 4. 모의 예약 대행 모달 상태
-  const [showReserveModal, setShowReserveModal] = useState(false);
-  const [reserveName, setReserveName] = useState('');
-  const [reserveDate, setReserveDate] = useState('');
-  const [reserveTime, setReserveTime] = useState('');
-  const [reserveSuccess, setReserveSuccess] = useState(false);
 
-  // 맛집이 바뀌면 복사 완료 모드 해제 및 localstorage 데이터 새로 로드
+
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
-    setCopied(false);
-    setDutchResult(null);
-    setTotalAmount('');
-    setNumPeople('');
-    setDiaryDate('');
-    setDiaryNotes('');
-    
-    if (restaurant) {
-      // 단골 상태 로드
-      const favs = JSON.parse(localStorage.getItem('daedong_favorites') || '[]');
-      setIsFavorite(favs.includes(restaurant.name));
-
-      // 일기 정보 로드
-      const allLogs = JSON.parse(localStorage.getItem('daedong_diary') || '{}');
-      setSavedLogs(allLogs[restaurant.name] || []);
+    const container = containerRef.current;
+    if (container) {
+      L.DomEvent.disableScrollPropagation(container);
+      L.DomEvent.disableClickPropagation(container);
     }
   }, [restaurant]);
 
@@ -121,12 +162,20 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
 
   // 단골 하트 토글 처리
   const handleToggleFavorite = () => {
-    const favs = JSON.parse(localStorage.getItem('daedong_favorites') || '[]');
+    let favs: string[] = [];
+    try {
+      const item = localStorage.getItem('daedong_favorites');
+      if (item) favs = JSON.parse(item);
+    } catch (e) {
+      console.error(e);
+    }
+
     let newFavs;
+    const restaurantKey = restaurant.id || restaurant.name;
     if (isFavorite) {
-      newFavs = favs.filter((f: string) => f !== restaurant.name);
+      newFavs = favs.filter((f: string) => f !== restaurantKey && f !== restaurant.name);
     } else {
-      newFavs = [...favs, restaurant.name];
+      newFavs = [...favs, restaurantKey];
     }
     localStorage.setItem('daedong_favorites', JSON.stringify(newFavs));
     setIsFavorite(!isFavorite);
@@ -149,40 +198,44 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
       alert('방문 날짜와 식사 소감을 입력해 주세요!');
       return;
     }
-    const allLogs = JSON.parse(localStorage.getItem('daedong_diary') || '{}');
-    const logs = allLogs[restaurant.name] || [];
+    
+    let allLogs: Record<string, Array<{ date: string; note: string }>> = {};
+    try {
+      const item = localStorage.getItem('daedong_diary');
+      if (item) allLogs = JSON.parse(item);
+    } catch (e) {
+      console.error(e);
+    }
+
+    const restaurantKey = restaurant.id || restaurant.name;
+    const logs = allLogs[restaurantKey] || allLogs[restaurant.name] || [];
     const newLog = { date: diaryDate, note: diaryNotes };
     const updatedLogs = [newLog, ...logs];
-    allLogs[restaurant.name] = updatedLogs;
+    allLogs[restaurantKey] = updatedLogs;
     localStorage.setItem('daedong_diary', JSON.stringify(allLogs));
     setSavedLogs(updatedLogs);
     setDiaryNotes('');
     setDiaryDate('');
 
     // 인스타 정복 인증서 연동을 위해 '방문 완료' 리스트에도 식당을 추가
-    const visited = JSON.parse(localStorage.getItem('daedong_visited') || '[]');
-    if (!visited.includes(restaurant.name)) {
-      visited.push(restaurant.name);
+    let visited: string[] = [];
+    try {
+      const item = localStorage.getItem('daedong_visited');
+      if (item) visited = JSON.parse(item);
+    } catch (e) {
+      console.error(e);
+    }
+
+    if (!visited.includes(restaurantKey) && !visited.includes(restaurant.name)) {
+      visited.push(restaurantKey);
       localStorage.setItem('daedong_visited', JSON.stringify(visited));
     }
+
+    // Dispatch event to notify unlock progress
+    window.dispatchEvent(new Event('daedong_unlock_progress'));
   };
 
-  // 모의 예약 대행 폼 신청 제출
-  const handleReserveSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!reserveName || !reserveDate || !reserveTime) {
-      alert('모든 예약자 정보를 바르게 입력해 주세요!');
-      return;
-    }
-    setReserveSuccess(true);
-    setTimeout(() => {
-      setReserveSuccess(false);
-      setShowReserveModal(false);
-      setReserveName('');
-      setReserveDate('');
-      setReserveTime('');
-    }, 2200);
-  };
+
 
   // 길찾기/검색 연동 URL (PC용 웹 fallback)
   const naverSearchUrl = `https://map.naver.com/v5/search/${encodeURIComponent(restaurant.portalSearchName || restaurant.name)}`;
@@ -203,36 +256,48 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
   else if (restaurant.category === '양식') badgeBg = 'rgba(16, 185, 129, 0.9)';
   else if (restaurant.category === '분식') badgeBg = 'rgba(236, 72, 153, 0.9)';
 
-  // 모바일 카카오맵 어플 연동 핸들러
+  // 모바일 카카오맵 어플 연동 핸들러 (실제 길찾기 경로 Scheme 우선 호출)
   const handleKakaoClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (isMobile) {
-      e.preventDefault();
-      const query = restaurant.portalSearchName || restaurant.name;
-      // 카카오맵 네이티브 앱 URL scheme
-      const appUrl = `kakaomap://search?q=${encodeURIComponent(query)}`;
-      // 앱 미설치 시 이동할 모바일 웹 URL (카카오 제공 공식 연동용)
-      const webUrl = `https://map.kakao.com/link/search/${encodeURIComponent(query)}`;
+    e.preventDefault();
+    const query = restaurant.portalSearchName || restaurant.name;
+    const lat = restaurant.latitude;
+    const lng = restaurant.longitude;
+
+    if (isMobile && lat && lng) {
+      // 카카오맵 어플의 길찾기(Route) 화면으로 다이렉트 연동
+      const appUrl = `kakaomap://route?ep=${lat},${lng}&by=car`;
+      // 모바일 웹용 카카오맵 공식 길찾기 리다이렉터 URL (앱 미설치 시 폰 웹 브라우저에서 대안 실행)
+      const webUrl = `https://map.kakao.com/link/to/${encodeURIComponent(query)},${lat},${lng}`;
 
       const start = Date.now();
       window.location.href = appUrl;
 
-      // 1.5초 이내에 페이지 포커스가 여전히 웹에 남아있으면(앱이 안 열렸으면) 웹 연동 실행
       setTimeout(() => {
         if (Date.now() - start < 2000) {
           window.open(webUrl, '_blank');
         }
       }, 1500);
+    } else {
+      // PC이거나 좌표가 없을 때는 일반 카카오맵 검색창 링크로 이동
+      const webUrl = lat && lng
+        ? `https://map.kakao.com/link/to/${encodeURIComponent(query)},${lat},${lng}`
+        : `https://map.kakao.com/?q=${encodeURIComponent(query)}`;
+      window.open(webUrl, '_blank');
     }
   };
 
-  // 모바일 네이버 지도 어플 연동 핸들러
+  // 모바일 네이버 지도 어플 연동 핸들러 (실제 길찾기 경로 Scheme 우선 호출)
   const handleNaverClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    if (isMobile) {
-      e.preventDefault();
-      const query = restaurant.portalSearchName || restaurant.name;
-      // 네이버 지도 네이티브 앱 URL scheme
-      const appUrl = `nmap://search?query=${encodeURIComponent(query)}&appname=com.daedong.matjido`;
-      const webUrl = `https://map.naver.com/v5/search/${encodeURIComponent(query)}`;
+    e.preventDefault();
+    const query = restaurant.portalSearchName || restaurant.name;
+    const lat = restaurant.latitude;
+    const lng = restaurant.longitude;
+
+    if (isMobile && lat && lng) {
+      // 네이버 지도 어플의 길찾기 화면으로 다이렉트 연동
+      const appUrl = `nmap://route/car?dlat=${lat}&dlng=${lng}&dname=${encodeURIComponent(query)}&appname=com.daedong.matjido`;
+      // 앱 미설치 시 이동할 모바일 웹 네이버지도 길찾기 경로
+      const webUrl = `https://m.map.naver.com/route.nhn?menu=route&elat=${lat}&elng=${lng}&etext=${encodeURIComponent(query)}&pathType=0`;
 
       const start = Date.now();
       window.location.href = appUrl;
@@ -242,20 +307,35 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
           window.open(webUrl, '_blank');
         }
       }, 1500);
+    } else {
+      // PC이거나 좌표가 없을 때는 일반 네이버 지도 길찾기/검색 경로로 이동
+      const webUrl = lat && lng
+        ? `https://map.naver.com/v5/directions/-/${lat},${lng},${encodeURIComponent(query)}/-/car`
+        : `https://map.naver.com/v5/search/${encodeURIComponent(query)}`;
+      window.open(webUrl, '_blank');
     }
   };
 
   // 클립보드에 맛집 정보 복사(공유) 처리
   const handleShareClick = () => {
     const shareText = `[대동맛지도 추천 맛집]\n상호명: ${restaurant.name}\n음식종류: ${restaurant.category}\n대표메뉴: ${restaurant.menu}\n주소: ${restaurant.address}\n전화번호: ${phone}\n추천사유: "${restaurant.review}"`;
-    navigator.clipboard.writeText(shareText).then(() => {
+    safeCopyToClipboard(shareText).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      
+      try {
+        const shares = parseInt(localStorage.getItem('daedong_share_count') || '0', 10);
+        localStorage.setItem('daedong_share_count', String(shares + 1));
+        window.dispatchEvent(new Event('daedong_unlock_progress'));
+      } catch (e) {
+        console.error(e);
+      }
     });
   };
 
   return (
     <div 
+      ref={containerRef}
       className="glass-panel animate-fade-in"
       style={{
         position: 'absolute',
@@ -484,7 +564,7 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
               <button
                 onClick={() => {
                   const shareText = `[대동맛지도 정산 알림]\n'${restaurant.name}'에서 식사 후 정산 요청입니다.\n총액: ${parseFloat(totalAmount).toLocaleString()}원 (${numPeople}명)\n1인당 송금액: ${dutchResult.toLocaleString()}원`;
-                  navigator.clipboard.writeText(shareText).then(() => alert('정산용 카카오톡 문구가 클립보드에 복사되었습니다.'));
+                  safeCopyToClipboard(shareText).then(() => alert('정산용 카카오톡 문구가 클립보드에 복사되었습니다.'));
                 }}
                 style={{ marginLeft: '8px', fontSize: '9px', background: 'rgba(255,255,255,0.06)', border: 'none', color: '#94a3b8', padding: '2px 6px', borderRadius: '4px', cursor: 'pointer' }}
               >
@@ -546,30 +626,7 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
           )}
         </div>
 
-        {/* 예약 대행 요청 버튼 */}
-        <button
-          onClick={() => setShowReserveModal(true)}
-          style={{
-            width: '100%',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '8px',
-            background: 'rgba(234, 179, 8, 0.05)',
-            border: '1.5px solid var(--accent-yellow)',
-            color: 'var(--accent-yellow)',
-            borderRadius: '8px',
-            padding: '11px 0',
-            fontSize: isMobile ? '11px' : '13px',
-            fontWeight: '800',
-            cursor: 'pointer',
-            boxShadow: '0 0 10px rgba(234, 179, 8, 0.1)',
-            transition: 'background 0.2s',
-            marginTop: '4px'
-          }}
-        >
-          🛎️ 대동비서 노포 예약 대행 신청
-        </button>
+
 
         {/* 액션 버튼 그룹 */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
@@ -656,7 +713,7 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
             {copied ? (
               <>
                 <CheckCircle size={14} style={{ color: 'var(--accent-green)' }} />
-                <span style={{ color: 'var(--accent-green)' }}>복구된 정보 복사 완료!</span>
+                <span style={{ color: 'var(--accent-green)' }}>맛집 정보 복사 완료!</span>
               </>
             ) : (
               <>
@@ -692,94 +749,6 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
         </div>
 
       </div>
-
-      {/* 모의 예약 신청 팝업 모달 */}
-      {showReserveModal && (
-        <div style={{
-          position: 'absolute',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          background: 'rgba(2, 6, 17, 0.95)',
-          display: 'flex',
-          justifyContent: 'center',
-          alignItems: 'center',
-          zIndex: 1200,
-          padding: '20px'
-        }} className="animate-fade-in">
-          <div style={{
-            width: '100%',
-            maxWidth: '300px',
-            background: '#1e293b',
-            border: '1.5px solid var(--accent-yellow)',
-            borderRadius: '12px',
-            padding: '20px',
-            position: 'relative'
-          }}>
-            <button 
-              onClick={() => setShowReserveModal(false)}
-              style={{ position: 'absolute', top: '12px', right: '12px', background: 'transparent', border: 'none', color: '#94a3b8', cursor: 'pointer' }}
-            >
-              <X size={14} />
-            </button>
-
-            {reserveSuccess ? (
-              <div style={{ textAlign: 'center', padding: '20px 0' }} className="animate-fade-in">
-                <span style={{ fontSize: '28px' }}>🚀</span>
-                <h4 style={{ fontSize: '18px', fontWeight: '900', color: '#f8fafc', marginTop: '10px' }}>신청 완료!</h4>
-                <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>대동비서가 신속히 예약을 대행하고 카카오톡으로 진행 상황을 보내드립니다.</p>
-              </div>
-            ) : (
-              <form onSubmit={handleReserveSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ textAlign: 'center', marginBottom: '4px' }}>
-                  <h4 style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc' }}>🛎️ 예약 대행 접수 비서</h4>
-                  <p style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>전화 연결이 힘든 명품 노포 예약을 지원합니다.</p>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '9px', color: 'var(--text-secondary)', marginBottom: '3px', fontWeight: '700' }}>예약자 성함</label>
-                  <input 
-                    type="text" 
-                    value={reserveName}
-                    onChange={e => setReserveName(e.target.value)}
-                    style={{ width: '100%', padding: '6px 8px', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-glass)', borderRadius: '6px', color: '#fff', fontSize: '11px', outline: 'none' }}
-                    placeholder="홍길동"
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '9px', color: 'var(--text-secondary)', marginBottom: '3px', fontWeight: '700' }}>예약 희망일</label>
-                  <input 
-                    type="date" 
-                    value={reserveDate}
-                    onChange={e => setReserveDate(e.target.value)}
-                    style={{ width: '100%', padding: '6px 8px', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-glass)', borderRadius: '6px', color: '#fff', fontSize: '11px', outline: 'none' }}
-                  />
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '9px', color: 'var(--text-secondary)', marginBottom: '3px', fontWeight: '700' }}>희망 시간</label>
-                  <input 
-                    type="time" 
-                    value={reserveTime}
-                    onChange={e => setReserveTime(e.target.value)}
-                    style={{ width: '100%', padding: '6px 8px', background: 'rgba(0,0,0,0.25)', border: '1px solid var(--border-glass)', borderRadius: '6px', color: '#fff', fontSize: '11px', outline: 'none' }}
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  style={{ width: '100%', padding: '9px 0', background: 'var(--accent-yellow)', color: '#020617', border: 'none', borderRadius: '6px', fontSize: '11px', fontWeight: '800', cursor: 'pointer' }}
-                >
-                  비서 대행 신청 접수
-                </button>
-              </form>
-            )}
-          </div>
-        </div>
-      )}
-
     </div>
   );
 }
