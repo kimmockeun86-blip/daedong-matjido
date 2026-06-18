@@ -761,23 +761,23 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
               alignItems: 'center',
               justifyContent: 'center',
               gap: '8px',
-              background: 'linear-gradient(135deg, #1d4ed8, #2563eb)',
+              background: '#fee500',
               border: 'none',
-              color: '#ffffff',
+              color: '#191919',
               borderRadius: '8px',
               padding: '11px 0',
               fontSize: isMobile ? '11px' : '13px',
               fontWeight: '700',
               cursor: 'pointer',
               transition: 'opacity 0.2s',
-              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.2)'
+              boxShadow: '0 4px 12px rgba(254, 229, 0, 0.15)'
             }}
             onMouseEnter={(e) => e.currentTarget.style.opacity = '0.9'}
             onMouseLeave={(e) => e.currentTarget.style.opacity = '1'}
           >
             {taxiCopied ? (
               <>
-                <CheckCircle size={14} style={{ color: '#ffffff' }} />
+                <CheckCircle size={14} style={{ color: '#191919' }} />
                 <span>주소 복사 완료 & 카카오 T 호출 중...</span>
               </>
             ) : (

@@ -164,21 +164,6 @@ export default function App() {
 
     if (onboardingTaste && onboardingTaste !== '전체') {
       setSelectedCategory(onboardingTaste);
-
-      if (restaurants.length > 0) {
-        const categoryRestaurants = restaurants.filter(r => r.category === onboardingTaste);
-        if (categoryRestaurants.length > 0) {
-          const sorted = [...categoryRestaurants].sort((a, b) => b.rating - a.rating);
-          const topRest = sorted[0];
-
-          setTimeout(() => {
-            handleSelectRestaurant(topRest);
-            if (topRest.latitude && topRest.longitude && mapRef.current) {
-              mapRef.current.setView([topRest.latitude, topRest.longitude], 15, { animate: true, duration: 1.0 });
-            }
-          }, 100);
-        }
-      }
     }
 
     setShowWelcomeModal(false);
@@ -216,6 +201,9 @@ export default function App() {
 
   // 딥링크 처리 방지용 가드 Ref
   const hasProcessedDeepLink = useRef(false);
+
+  // 온보딩 맛 취향 가드 Ref
+  const hasAppliedOnboardingTaste = useRef(false);
 
   // 지오코딩 변환 진행 상태
   const [geocodingProgress, setGeocodingProgress] = useState<{ current: number; total: number } | null>(null);
@@ -521,6 +509,27 @@ export default function App() {
       }, 0);
     }
   }, [restaurants, mapRef, top10Ids, unlockProgress.isUnlocked, setIsToolkitOpen, selectedCategory, minRating, selectedRegion, searchQuery, handleSelectRestaurant]);
+
+  // 4.5. 온보딩 맛 취향 웰컴 선택 자동 포커싱 및 줌
+  useEffect(() => {
+    if (!showWelcomeModal && restaurants.length > 0 && !hasAppliedOnboardingTaste.current) {
+      hasAppliedOnboardingTaste.current = true;
+      if (onboardingTaste && onboardingTaste !== '전체') {
+        const categoryRestaurants = restaurants.filter(r => r.category === onboardingTaste);
+        if (categoryRestaurants.length > 0) {
+          const sorted = [...categoryRestaurants].sort((a, b) => b.rating - a.rating);
+          const topRest = sorted[0];
+
+          setTimeout(() => {
+            handleSelectRestaurant(topRest);
+            if (topRest.latitude && topRest.longitude && mapRef.current) {
+              mapRef.current.setView([topRest.latitude, topRest.longitude], 15, { animate: true, duration: 1.0 });
+            }
+          }, 100);
+        }
+      }
+    }
+  }, [showWelcomeModal, restaurants, onboardingTaste, handleSelectRestaurant]);
 
   // 5. 지역(selectedRegion) 필터 선택 시 지도 뷰포트 자동 이동
   useEffect(() => {
