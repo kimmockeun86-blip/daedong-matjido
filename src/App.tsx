@@ -209,7 +209,7 @@ export default function App() {
   // 지오코딩 변환 진행 상태
   const [geocodingProgress, setGeocodingProgress] = useState<{ current: number; total: number } | null>(null);
 
-  // 1. 초기 마운트 시 맛집 데이터 로드 (로컬스토리지 우선, 없을 시 /restaurants.json 자동 로드)
+  // 1. 초기 마운트 시 맛집 데이터 로드 (로컬스토리지 우선, 없을 시 /restaurants.json 자동 로드, 기존 데이터 최신 이미지 병합)
   useEffect(() => {
     const loadInitialData = async () => {
       try {
@@ -224,18 +224,50 @@ export default function App() {
           }
         }
 
-        if (parsed && Array.isArray(parsed)) {
-          setRestaurants(ensureRestaurantIds(parsed));
-        } else {
-          // 로컬스토리지에 없으면 빌드된 맛집 JSON 로드
-          console.log('로컬스토리지 데이터 없음, 기본 맛집 데이터 로드 중...');
+        // 최신 이미지 동기화를 위해 /restaurants.json 항상 가져오기
+        let defaultData: Partial<RestaurantRaw>[] = [];
+        try {
           const response = await fetch('/restaurants.json');
           if (response.ok) {
-            const data = await response.json();
-            const withIds = ensureRestaurantIds(data);
-            setRestaurants(withIds);
+            defaultData = await response.json();
+          }
+        } catch (e) {
+          console.error('Failed to fetch default restaurants.json for sync', e);
+        }
+
+        if (parsed && Array.isArray(parsed)) {
+          // 기본 맛집 목록의 이미지와 매핑하여 캐시된 데이터에 병합 (Cycle 26 Auto-Sync)
+          const defaultImageMap = new Map<string, string>();
+          defaultData.forEach(r => {
+            if (r.name && r.image) {
+              const key = `${r.name}_${r.address || ''}`.trim();
+              defaultImageMap.set(key, r.image);
+            }
+          });
+
+          let hasMergedNewImages = false;
+          const merged = parsed.map(r => {
+            const key = `${r.name}_${r.address || ''}`.trim();
+            const defaultImg = defaultImageMap.get(key);
+            if (defaultImg && !r.image) {
+              r.image = defaultImg;
+              hasMergedNewImages = true;
+            }
+            return r;
+          });
+
+          const withIds = ensureRestaurantIds(merged);
+          setRestaurants(withIds);
+          if (hasMergedNewImages) {
+            console.log('[AUTO-SYNC] Cached restaurants merged with new crawled images.');
             localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));
           }
+        } else if (defaultData.length > 0) {
+          // 로컬스토리지에 없으면 빌드된 맛집 JSON 로드
+          console.log('로컬스토리지 데이터 없음, 기본 맛집 데이터 로드 중...');
+          const withIds = ensureRestaurantIds(defaultData);
+          setRestaurants(withIds);
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));
         }
       } catch (err) {
         console.error('초기 맛집 데이터 로드 실패:', err);
@@ -455,9 +487,37 @@ export default function App() {
         setSelectedRegion('전체');
         setSearchQuery('');
       }
+
+      // 4. 식당 이미지가 없을 경우 실시간 온디맨드 크롤링 (Cycle 26)
+      if (!restaurant.image) {
+        const crawlQuery = restaurant.portalSearchName || `${restaurant.city || restaurant.region || ''} ${restaurant.name}`;
+        fetch(`/api/crawl-image?query=${encodeURIComponent(crawlQuery)}`)
+          .then(res => {
+            if (res.ok) return res.json();
+            throw new Error('Crawl failed');
+          })
+          .then(data => {
+            if (data.image) {
+              setRestaurants(prev => {
+                const next = prev.map(r => {
+                  if (r.id === restaurant.id) {
+                    return { ...r, image: data.image };
+                  }
+                  return r;
+                });
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next));
+                return next;
+              });
+              setSelectedRestaurant(prev => prev && prev.id === restaurant.id ? { ...prev, image: data.image } : prev);
+            }
+          })
+          .catch(err => {
+            console.error('Failed to crawl image on the fly:', err);
+          });
+      }
     }
     setSelectedRestaurant(restaurant);
-  }, [top10Ids, unlockProgress.isUnlocked, selectedCategory, minRating, selectedRegion, searchQuery]);
+  }, [top10Ids, unlockProgress.isUnlocked, selectedCategory, minRating, selectedRegion, searchQuery, setRestaurants]);
 
   // 딥링크 지원 (?restaurantId=... 또는 ?id=... 또는 ?route=id1,id2,id3)
   useEffect(() => {
