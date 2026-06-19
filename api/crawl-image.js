@@ -31,14 +31,23 @@ export default async function handler(req, res) {
       return;
     }
 
-    const html = await fetchResponse.text();
-    // 이미지 매칭용 정규식
-    const regex = /https:\/\/search\.pstatic\.net\/common\/[^"'\s]+/g;
+    let html = await fetchResponse.text();
+    // HTML 및 JSON 이스케이프 문자 디코딩하여 깨끗한 URL 획득
+    html = html
+      .replace(/&amp;/g, '&')
+      .replace(/\\u0026/g, '&')
+      .replace(/\\u002f/g, '/')
+      .replace(/\\u002F/g, '/')
+      .replace(/\\u003d/g, '=')
+      .replace(/\\u003D/g, '=')
+      .replace(/&quot;/g, '"');
+
+    // 쉼표, 따옴표, 중괄호 등으로 흘러넘치지 않도록 제한된 URL 정규식 사용
+    const regex = /https:\/\/search\.pstatic\.net\/common\/[a-zA-Z0-9_\-\.\/\?=&%\+#:]+/g;
     const matches = html.match(regex) || [];
 
     // 제외할 이미지 패턴 필터링 및 점수 매칭 (크롤러 스크립트와 동일한 정밀 로직 적용)
     const ratedImages = matches
-      .map(m => m.replace(/&amp;/g, '&'))
       .filter(img => {
         const lower = img.toLowerCase();
         // 프로필 및 소형 아이콘 제외
