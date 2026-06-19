@@ -37,6 +37,7 @@ const ensureRestaurantIds = (data: Partial<RestaurantRaw>[]): RestaurantRaw[] =>
 
 export default function App() {
   const [restaurants, setRestaurants] = useState<RestaurantRaw[]>([]);
+  const geocodingTaskIdRef = useRef(0);
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantRaw | null>(null);
 
   const [unlockProgress, setUnlockProgress] = useState(() => {
@@ -317,6 +318,9 @@ export default function App() {
 
   // 2. 엑셀 파일 파싱 후 좌표가 없는 주소들에 대해 지오코딩 일괄 수행
   const handleDataParsed = async (rawRestaurants: RestaurantRaw[]) => {
+    // 진행 중인 지오코딩 태스크 번호 갱신 (이전 루프 즉시 정지)
+    const taskId = ++geocodingTaskIdRef.current;
+
     // 위경도 좌표가 없는 항목들을 수집
     const missingCoords = rawRestaurants.filter(
       r => r.latitude === undefined || r.longitude === undefined
@@ -341,6 +345,12 @@ export default function App() {
     let processedCount = 0;
 
     for (let i = 0; i < updatedRestaurants.length; i++) {
+      // 비동기 루프 도중 신규 태스크 인입 시 현재 루프 중단
+      if (taskId !== geocodingTaskIdRef.current) {
+        console.log(`[Geocoding] Task ${taskId} aborted.`);
+        return;
+      }
+
       const res = updatedRestaurants[i];
       if (res.latitude === undefined || res.longitude === undefined) {
         processedCount++;
@@ -364,6 +374,13 @@ export default function App() {
         // 실시간 위경도 변환 API 요청
         if (res.address) {
           const coords = await geocodeAddress(res.address);
+          
+          // API 응답 직후 신규 태스크 인입 확인
+          if (taskId !== geocodingTaskIdRef.current) {
+            console.log(`[Geocoding] Task ${taskId} aborted after fetch.`);
+            return;
+          }
+
           if (coords) {
             res.latitude = coords.latitude;
             res.longitude = coords.longitude;
@@ -388,6 +405,12 @@ export default function App() {
       }
     }
 
+    // 전역 상태에 머지하기 직전 경쟁 상태 최종 검증
+    if (taskId !== geocodingTaskIdRef.current) {
+      console.log(`[Geocoding] Task ${taskId} aborted before commit.`);
+      return;
+    }
+
     setGeocodingProgress(null);
     const withIds = ensureRestaurantIds(updatedRestaurants);
     setRestaurants(withIds);
@@ -401,6 +424,10 @@ export default function App() {
 
   // 3. 맛집 데이터 초기화
   const handleResetData = () => {
+    // 진행 중인 지오코딩 태스크가 있다면 취소
+    geocodingTaskIdRef.current++;
+    setGeocodingProgress(null);
+
     localStorage.removeItem(LOCAL_STORAGE_KEY);
     setRestaurants([]);
     setSelectedRestaurant(null);

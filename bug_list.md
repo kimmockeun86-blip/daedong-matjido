@@ -962,4 +962,44 @@ Cycle 22 (요청된 Cycle 11 단계) 정밀 검토 결과, **코드베이스 내
 * **해결 방안**: 
   - 상기 이스케이프 슬래시 및 캡차 감지 개선 크롤링 로직이 보완된 스크립트로 해당 11곳에 대해 이미지 자동 재수집을 트리거하거나, 포털 검색명이 매칭되기 힘든 상호명인 경우 `portalSearchName`을 수동 보강하여 재동작시켜 100%에 달하는 이미지 정합성을 제공해야 합니다.
 
+---
+
+## Cycle 38. 지도 스킨 전환기 모바일 레이아웃 터치 전파 및 지오코딩 경쟁 상태 분석 리포트 (Cycle 38 Map Skin Switcher Touch propagation & Geocoding Race Conditions Scan)
+
+* **검사 일시**: 2026-06-20
+* **TypeScript 컴파일 검증**: 성공 (0 Errors, 0 Warnings)
+* **ESLint 정적 분석 검증**: 성공 (0 Errors, 0 Warnings)
+
+### 발견된 신규 예외 케이스 및 개선안
+#### 61. 지도 스킨 전환기(Map Skin Switcher) 내 모바일 터치 및 포인터 이벤트 버블링 미차단으로 인한 지도 간섭 (Uncaught Mobile Touch & Pointer Events Bubble in Map Skin Switcher)
+* **상태**: 해결 완료 (Cycle 38)
+* **위치**: `src/components/GourmetMap.tsx` (Line 346-395)
+* **설명**: 
+  - 현재 지도 스킨 전환기 컨테이너는 React의 `onClick` 및 `onMouseDown` 이벤트에 대해서만 `e.stopPropagation()`을 호출하여 차단하고 있습니다.
+  - 그러나 모바일 터치 환경(Safari, Chrome iOS/Android 등) 및 하이브리드 웹뷰 환경에서는 사용자가 터치 조작 시 `touchstart`, `touchmove`, `touchend` 또는 `pointerdown`, `pointerup`, `pointermove` 이벤트가 발생합니다.
+  - 이 터치/포인터 이벤트들의 버블링이 명시적으로 차단되지 않아 지도가 밑에 깔려 있을 때 스킨 전환기 내부 버튼을 탭하거나 스크롤하려 하면 Leaflet 지도가 터치 이벤트를 동시에 수신하여 지도가 예기치 않게 드래그(드래그 맵 팬)되거나 화면이 튀는 현상(Accidental map panning & zooming)이 발생할 수 있습니다.
+* **해결 방안**: 
+  - 스킨 전환기 `div` 컨테이너에 `onTouchStart`, `onTouchMove`, `onTouchEnd`, `onPointerDown` 등에 대해서도 `e.stopPropagation()`을 걸어주거나, Leaflet이 제공하는 유틸리티 메서드인 `L.DomEvent.disableClickPropagation` 및 `L.DomEvent.disableScrollPropagation`을 Sidebar나 DetailPanel처럼 `useEffect` 내부에서 switcher DOM 레퍼런스에 바인딩하여 모든 네이티브 클릭/스크롤/터치 이벤트 전파를 원천 격리하는 것이 바람직합니다.
+
+#### 62. 지도 스킨 전환기(Map Skin Switcher) 모바일 초소형 뷰포트 내 레이아웃 가로 깨짐 및 버튼 넘침 버그 (Layout Overflow on Ultra-Narrow Viewports in Map Skin Switcher)
+* **상태**: 해결 완료 (Cycle 38)
+* **위치**: `src/components/GourmetMap.tsx` (Line 368-394)
+* **설명**: 
+  - 현재 테마 버튼들을 렌더링하는 컨테이너는 `display: 'flex'`, `gap: '4px'` 구조로 구현되어 있으며, 줄바꿈 방지 및 자동 크기 축소가 명시되지 않았습니다.
+  - 3개의 버튼("Neon Dark", "Joseon Vintage Scroll", "CartoDB Light")의 텍스트 길이를 포함한 합산 너비는 약 290px~312px에 이르는데, 여기에 컨테이너 패드와 지도 내부 우측 오프셋(`right: 24px`)을 감안하면 최소 360px 이상의 가로폭을 필요로 합니다.
+  - 가로 해상도가 320px~360px인 초소형 모바일 기기(예: iPhone SE 등) 또는 화면 분할 모드에서는 스킨 전환기 영역이 화면 왼쪽 밖으로 튀어나가 텍스트가 잘리거나 가로로 찌그러져 폰트 가독성이 심각하게 저하되는 UI/UX 깨짐 현상이 발생할 수 있습니다.
+* **해결 방안**: 
+  - 버튼을 래핑하는 Flex 컨테이너에 `flexWrap: 'wrap'` 속성을 추가하거나, 모바일 뷰포트 크기에 맞춰 폰트 크기 및 패딩 값을 동적으로 미세 조정(또는 세로 배치)하도록 미디어 쿼리 혹은 JS 내 `isMobile` 판별 플래그를 확장 적용해야 합니다.
+
+#### 63. 주소 지오코딩 처리 중 신규 파일 중복 업로드로 인한 비동기 경쟁 상태 및 Nominatim API 한도 초과 오류 (Asynchronous Race Condition & Rate Limit Overload in handleDataParsed)
+* **상태**: 해결 완료 (Cycle 38)
+* **위치**: `src/App.tsx` (Line 319-400)
+* **설명**: 
+  - 사용자가 위경도 좌표가 누락된 엑셀 파일을 업로드하면, `handleDataParsed` 내에서 Nominatim API의 초당 1회 호출 제한 정책을 준수하며 순차적으로 비동기 `fetch` 루프를 실행합니다.
+  - 그러나 이미 지오코딩 작업 루프가 실행 중인 상태에서 유저가 새로운 엑셀 파일을 다시 업로드하거나 기본 맛집 데이터를 강제 초기화한 뒤 로드하면, 이전에 실행되던 비동기 `for` 루프가 취소되지 않은 상태에서 새 비동기 루프가 중첩되어 시작됩니다.
+  - 이로 인해 두 개 이상의 루프가 백그라운드에서 동시에 실행되어 Nominatim API를 초당 2회 이상 호출하게 됨으로써 API 블락(403 Forbidden 등)을 유발하고, `geocodingProgress` 및 `restaurants` 전역 상태를 동시에 제어하여 진행 수치 깜빡임, 업로드된 맛집 데이터 유실 및 덮어쓰기 오작동 등 심각한 상태 동기화 파괴(State Sync Glitches) 현상이 일어납니다.
+* **해결 방안**: 
+  - `App.tsx`에 진행 중인 비동기 작업을 취소할 수 있는 `AbortController`를 관리하거나, 작업 중임을 나타내는 `isGeocodingActiveRef` 또는 작업 고유 ID(`currentTaskRef`)를 설정하여 신규 파일 파싱 및 로드 시 이전 실행 중인 지오코딩 작업을 즉시 안전하게 중단(break)시킬 수 있는 예외 처리 로직을 보완해야 합니다.
+
+
 

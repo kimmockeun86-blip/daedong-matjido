@@ -346,26 +346,33 @@ export default function GourmetMap({
       <div 
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
+        onTouchStart={(e) => e.stopPropagation()}
+        onTouchMove={(e) => e.stopPropagation()}
+        onTouchEnd={(e) => e.stopPropagation()}
+        onPointerDown={(e) => e.stopPropagation()}
+        onPointerUp={(e) => e.stopPropagation()}
         style={{
           position: 'absolute',
           top: '24px',
           right: '24px',
           zIndex: 999,
-        background: 'rgba(15, 23, 42, 0.85)',
-        backdropFilter: 'blur(12px)',
-        WebkitBackdropFilter: 'blur(12px)',
-        border: '1.5px solid var(--accent-cyan)',
-        borderRadius: '10px',
-        padding: '10px',
-        boxShadow: '0 0 15px rgba(6, 182, 212, 0.3)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: '6px'
-      }}>
+          background: 'rgba(15, 23, 42, 0.85)',
+          backdropFilter: 'blur(12px)',
+          WebkitBackdropFilter: 'blur(12px)',
+          border: '1.5px solid var(--accent-cyan)',
+          borderRadius: '10px',
+          padding: '10px',
+          boxShadow: '0 0 15px rgba(6, 182, 212, 0.3)',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '6px',
+          maxWidth: 'calc(100vw - 48px)'
+        }}
+      >
         <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--accent-cyan)', letterSpacing: '0.05em' }}>
           MAP SKIN SWITCHER
         </div>
-        <div style={{ display: 'flex', gap: '4px' }}>
+        <div style={{ display: 'flex', gap: '4px', flexWrap: 'wrap' }}>
           {[
             { id: 'cyberpunk' as const, name: 'Neon Dark' },
             { id: 'smooth' as const, name: 'Joseon Vintage Scroll' },
