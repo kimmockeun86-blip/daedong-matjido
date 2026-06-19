@@ -1104,7 +1104,7 @@ export default function Sidebar({
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' }}>
                 {filteredRestaurants.map((res, idx) => {
-                  const isLockedItem = !unlockProgress.isUnlocked && idx >= 5;
+                  const isLockedItem = false;
                   const isSelected = selectedRestaurant?.id === res.id;
                   const isSponsored = res.name === '경상도집' || res.name === '굴다리식당';
                   

@@ -178,8 +178,13 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
     } else {
       newFavs = [...favs, restaurantKey];
     }
-    localStorage.setItem('daedong_favorites', JSON.stringify(newFavs));
-    setIsFavorite(!isFavorite);
+    try {
+      localStorage.setItem('daedong_favorites', JSON.stringify(newFavs));
+      setIsFavorite(!isFavorite);
+    } catch (e) {
+      console.error('Failed to save favorites to localStorage:', e);
+      alert('⚠️ 브라우저 저장 공간이 가득 찼거나 권한이 제한되어 즐겨찾기를 저장하지 못했습니다.');
+    }
   };
 
   // 더치페이 정산 계산기
@@ -213,10 +218,16 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
     const newLog = { date: diaryDate, note: diaryNotes };
     const updatedLogs = [newLog, ...logs];
     allLogs[restaurantKey] = updatedLogs;
-    localStorage.setItem('daedong_diary', JSON.stringify(allLogs));
-    setSavedLogs(updatedLogs);
-    setDiaryNotes('');
-    setDiaryDate('');
+    try {
+      localStorage.setItem('daedong_diary', JSON.stringify(allLogs));
+      setSavedLogs(updatedLogs);
+      setDiaryNotes('');
+      setDiaryDate('');
+    } catch (e) {
+      console.error('Failed to save diary to localStorage:', e);
+      alert('⚠️ 브라우저 저장 공간이 가득 찼거나 권한이 제한되어 미식 일기를 저장하지 못했습니다.');
+      return;
+    }
 
     // 인스타 정복 인증서 연동을 위해 '방문 완료' 리스트에도 식당을 추가
     let visited: string[] = [];
@@ -229,7 +240,11 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
 
     if (!visited.includes(restaurantKey) && !visited.includes(restaurant.name)) {
       visited.push(restaurantKey);
-      localStorage.setItem('daedong_visited', JSON.stringify(visited));
+      try {
+        localStorage.setItem('daedong_visited', JSON.stringify(visited));
+      } catch (e) {
+        console.error('Failed to save visited status to localStorage:', e);
+      }
     }
 
     // Dispatch event to notify unlock progress
