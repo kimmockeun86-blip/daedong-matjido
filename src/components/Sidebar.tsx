@@ -104,11 +104,24 @@ export default function Sidebar({
   }, [isCollapsed, isMobile, mapRef]);
 
   // Bug 8: disableScrollPropagation & disableClickPropagation on Sidebar
+  // Also stop touchmove/touchend propagation to prevent Leaflet map panning on mobile scroll
   useEffect(() => {
     const container = containerRef.current;
     if (container) {
       L.DomEvent.disableScrollPropagation(container);
       L.DomEvent.disableClickPropagation(container);
+
+      const stopTouch = (e: TouchEvent) => {
+        e.stopPropagation();
+      };
+      
+      container.addEventListener('touchmove', stopTouch, { passive: false });
+      container.addEventListener('touchend', stopTouch, { passive: false });
+      
+      return () => {
+        container.removeEventListener('touchmove', stopTouch);
+        container.removeEventListener('touchend', stopTouch);
+      };
     }
   }, []);
 
@@ -133,7 +146,7 @@ export default function Sidebar({
 
   // 2. 지하철역 중간지점 탐색 상태
   const [showStationSearch, setShowStationSearch] = useState(false);
-  const [showToolkitSection, setShowToolkitSection] = useState(true);
+  const [showToolkitSection, setShowToolkitSection] = useState(!isMobile);
   const [station1, setStation1] = useState('');
   const [station2, setStation2] = useState('');
 
@@ -280,7 +293,15 @@ export default function Sidebar({
 
       {/* 사이드바 콘텐츠 */}
       {!isCollapsed && (
-        <div style={{ display: 'flex', flexDirection: 'column', height: '100%', gap: '16px', width: '100%' }}>
+        <div style={{ 
+          display: 'flex', 
+          flexDirection: 'column', 
+          height: '100%', 
+          gap: '16px', 
+          width: '100%',
+          overflowY: 'hidden',
+          paddingRight: '6px'
+        }}>
           
           {/* 최상단 헤더 영역 */}
           <div>
@@ -344,24 +365,26 @@ export default function Sidebar({
             </div>
           </div>
 
-          {/* 7년 실방문 보증 네온 배너 */}
-          <div style={{
-            background: 'linear-gradient(90deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 179, 8, 0.05) 100%)',
-            border: '1px solid rgba(249, 115, 22, 0.3)',
-            borderRadius: '10px',
-            padding: '10px 14px',
-            fontSize: '12px',
-            lineHeight: '1.4',
-            color: '#ffedd5',
-            fontWeight: '600',
-            boxShadow: '0 0 10px rgba(249, 115, 22, 0.1)',
-            flexShrink: 0
-          }}>
-            🍊 <span style={{ color: 'var(--accent-orange)', fontWeight: '800' }}>7년 간 직접 가본 맛집으로만 만든 최고의 대동맛지도!</span>
-            <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: '500' }}>
-              광고나 홍보 대가 없는 순도 100% 현지인 검증 노포/맛집 824곳을 조망하세요.
+          {/* 7년 실방문 보증 네온 배너 (데스크톱 전용) */}
+          {!isMobile && (
+            <div style={{
+              background: 'linear-gradient(90deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 179, 8, 0.05) 100%)',
+              border: '1px solid rgba(249, 115, 22, 0.3)',
+              borderRadius: '10px',
+              padding: '10px 14px',
+              fontSize: '12px',
+              lineHeight: '1.4',
+              color: '#ffedd5',
+              fontWeight: '600',
+              boxShadow: '0 0 10px rgba(249, 115, 22, 0.1)',
+              flexShrink: 0
+            }}>
+              🍊 <span style={{ color: 'var(--accent-orange)', fontWeight: '800' }}>7년 간 직접 가본 맛집으로만 만든 최고의 대동맛지도!</span>
+              <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: '500' }}>
+                광고나 홍보 대가 없는 순도 100% 현지인 검증 노포/맛집 824곳을 조망하세요.
+              </div>
             </div>
-          </div>
+          )}
 
           {/* 검색창 */}
           <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
@@ -700,53 +723,57 @@ export default function Sidebar({
             </>
           ) }
 
-          {/* 전체 분석 리포트 카드 */}
-          <div style={{
-            background: 'rgba(139, 92, 246, 0.03)',
-            border: '1px solid rgba(139, 92, 246, 0.18)',
-            borderRadius: '10px',
-            padding: '12px 14px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '8px'
-          }}>
-            <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <BarChart3 size={12} />
-              전체 분석리포트
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-              <div>
-                강세 카테고리: <span style={{ color: '#f8fafc', fontWeight: '600' }}>한식(571곳), 기타(114곳)</span>
-              </div>
-              <div>
-                추천 대표메뉴: <span style={{ color: '#f8fafc', fontWeight: '600' }}>양꼬치, 돈까스, 매운탕</span>
-              </div>
-            </div>
-          </div>
-
-          {/* 스폰서 광고 슬롯 */}
-          <div className="ad-slot-box">
-            <span style={{
-              position: 'absolute',
-              top: '6px',
-              right: '8px',
-              fontSize: '8px',
-              fontWeight: '700',
-              color: 'var(--accent-yellow)',
-              letterSpacing: '0.08em',
-              background: 'rgba(234, 179, 8, 0.08)',
-              padding: '1px 4px',
-              borderRadius: '3px'
+          {/* 전체 분석 리포트 카드 (데스크톱 전용) */}
+          {!isMobile && (
+            <div style={{
+              background: 'rgba(139, 92, 246, 0.03)',
+              border: '1px solid rgba(139, 92, 246, 0.18)',
+              borderRadius: '10px',
+              padding: '12px 14px',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '8px'
             }}>
-              SPONSOR
-            </span>
-            <div style={{ color: '#f8fafc', fontSize: '12px', fontWeight: '700', marginBottom: '2px' }}>
-              광고 영역 (Ad Slot)
+              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <BarChart3 size={12} />
+                전체 분석리포트
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                <div>
+                  강세 카테고리: <span style={{ color: '#f8fafc', fontWeight: '600' }}>한식(571곳), 기타(114곳)</span>
+                </div>
+                <div>
+                  추천 대표메뉴: <span style={{ color: '#f8fafc', fontWeight: '600' }}>양꼬치, 돈까스, 매운탕</span>
+                </div>
+              </div>
             </div>
-            <div style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>
-              구글 애드센스 광고가 게재될 공간입니다.
+          )}
+
+          {/* 스폰서 광고 슬롯 (데스크톱 전용) */}
+          {!isMobile && (
+            <div className="ad-slot-box">
+              <span style={{
+                position: 'absolute',
+                top: '6px',
+                right: '8px',
+                fontSize: '8px',
+                fontWeight: '700',
+                color: 'var(--accent-yellow)',
+                letterSpacing: '0.08em',
+                background: 'rgba(234, 179, 8, 0.08)',
+                padding: '1px 4px',
+                borderRadius: '3px'
+              }}>
+                SPONSOR
+              </span>
+              <div style={{ color: '#f8fafc', fontSize: '12px', fontWeight: '700', marginBottom: '2px' }}>
+                광고 영역 (Ad Slot)
+              </div>
+              <div style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>
+                구글 애드센스 광고가 게재될 공간입니다.
+              </div>
             </div>
-          </div>
+          )}
 
           {/* 🎮 미식 툴킷 즐길거리 (Interactive Tools) */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
@@ -847,7 +874,8 @@ export default function Sidebar({
             display: 'flex',
             flexDirection: 'column',
             gap: '12px',
-            paddingRight: '4px'
+            paddingRight: '4px',
+            minHeight: 0
           }}>
             {/* Top 10 Featured Collection */}
             <div style={{
