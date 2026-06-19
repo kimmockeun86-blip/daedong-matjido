@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">대동맛지도</string>
+    <string name="title_activity_main">대동맛지도</string>
+    <string name="package_name">com.daedong.matjido</string>
+    <string name="custom_url_scheme">com.daedong.matjido</string>
+</resources>
