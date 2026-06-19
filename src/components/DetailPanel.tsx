@@ -41,7 +41,7 @@ const safeCopyToClipboard = (text: string): Promise<void> => {
 const CATEGORY_IMAGES: Record<string, string[]> = {
   '한식': [
     'https://images.unsplash.com/photo-1596797038530-2c107229654b?w=600&auto=format&fit=crop', // 비빔밥
-    'https://images.unsplash.com/photo-1627308595229-7830a5c91f9f?w=600&auto=format&fit=crop'  // 한식 상차림
+    'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=600&auto=format&fit=crop'  // 한식 상차림
   ],
   '중식': [
     'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=600&auto=format&fit=crop', // 볶음면
