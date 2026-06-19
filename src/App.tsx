@@ -326,7 +326,12 @@ export default function App() {
       // 모든 맛집의 좌표가 미리 채워진 경우
       const withIds = ensureRestaurantIds(rawRestaurants);
       setRestaurants(withIds);
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));
+      } catch (e) {
+        console.error('Failed to save to localStorage:', e);
+        alert('⚠️ 브라우저 로컬 저장공간이 초과되었습니다. 불필요한 데이터를 정리하거나 더 작은 크기의 엑셀 파일을 업로드해주세요.');
+      }
       return;
     }
 
@@ -386,7 +391,12 @@ export default function App() {
     setGeocodingProgress(null);
     const withIds = ensureRestaurantIds(updatedRestaurants);
     setRestaurants(withIds);
-    localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));
+    try {
+      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));
+    } catch (e) {
+      console.error('Failed to save to localStorage:', e);
+      alert('⚠️ 브라우저 로컬 저장공간이 초과되었습니다. 불필요한 데이터를 정리하거나 더 작은 크기의 엑셀 파일을 업로드해주세요.');
+    }
   };
 
   // 3. 맛집 데이터 초기화
@@ -400,7 +410,7 @@ export default function App() {
     setMinRating(0);
   };
 
-  // 4. GPS 기반 내 주변 맛집 찾기 구현
+  // 4. GPS 기반 내 주변 맛집 찾기 구현 (고정밀 실패 시 일반정밀 Fallback 재시도 적용 - Bug 50)
   const handleGPSClick = () => {
     if (!navigator.geolocation) {
       alert('이 브라우저에서는 GPS 위치 정보 탐색을 지원하지 않습니다.');
@@ -413,44 +423,57 @@ export default function App() {
     setSelectedRegion('전체');
     setMinRating(0);
 
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude } = position.coords;
-        const map = mapRef.current;
-        if (map) {
-          // 사용자 위치로 지도 이동 (줌 레벨 14로 줌인)
-          map.setView([latitude, longitude], 14, { animate: true, duration: 1.0 });
+    const requestPosition = (highAccuracy: boolean) => {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          const map = mapRef.current;
+          if (map) {
+            // 사용자 위치로 지도 이동 (줌 레벨 14로 줌인)
+            map.setView([latitude, longitude], 14, { animate: true, duration: 1.0 });
 
-          // 로드된 맛집 중 사용자 위치에서 가장 가까운 맛집 탐색
-          if (restaurants.length > 0) {
-            let nearestRes: RestaurantRaw | null = null;
-            let minDist = Infinity;
+            // 로드된 맛집 중 사용자 위치에서 가장 가까운 맛집 탐색
+            if (restaurants.length > 0) {
+              let nearestRes: RestaurantRaw | null = null;
+              let minDist = Infinity;
 
-            restaurants.forEach((res) => {
-              if (res.latitude !== undefined && res.longitude !== undefined) {
-                const dLat = res.latitude - latitude;
-                const dLon = res.longitude - longitude;
-                const dist = dLat * dLat + dLon * dLon;
-                if (dist < minDist) {
-                  minDist = dist;
-                  nearestRes = res;
+              restaurants.forEach((res) => {
+                if (res.latitude !== undefined && res.longitude !== undefined) {
+                  const dLat = res.latitude - latitude;
+                  const dLon = res.longitude - longitude;
+                  const dist = dLat * dLat + dLon * dLon;
+                  if (dist < minDist) {
+                    minDist = dist;
+                    nearestRes = res;
+                  }
                 }
-              }
-            });
+              });
 
-            // 위경도상 적정 오차 범위 이내인 경우 가장 가까운 맛집 자동 선택 포커싱
-            if (nearestRes && minDist < 0.5) {
-              setSelectedRestaurant(nearestRes);
+              // 위경도상 적정 오차 범위 이내인 경우 가장 가까운 맛집 자동 선택 포커싱
+              if (nearestRes && minDist < 0.5) {
+                setSelectedRestaurant(nearestRes);
+              }
             }
           }
+        },
+        (error) => {
+          console.error(`GPS 내 위치 획득 실패 (highAccuracy=${highAccuracy}):`, error);
+          if (highAccuracy) {
+            console.log('GPS 고정밀 탐색 실패, 일반 정밀도로 재시도합니다...');
+            requestPosition(false);
+          } else {
+            alert('내 위치 정보를 불러오지 못했습니다. 위치 권한이 비활성화되었거나 신호가 약할 수 있습니다.');
+          }
+        },
+        { 
+          enableHighAccuracy: highAccuracy, 
+          timeout: highAccuracy ? 7000 : 12000, 
+          maximumAge: highAccuracy ? 0 : 30000 
         }
-      },
-      (error) => {
-        console.error('GPS 내 위치 획득 실패:', error);
-        alert('내 위치 정보를 불러오지 못했습니다. 위치 정보 엑세스 권한을 허용해주세요.');
-      },
-      { enableHighAccuracy: true, timeout: 7000, maximumAge: 0 }
-    );
+      );
+    };
+
+    requestPosition(true);
   };
 
   // 통합 맛집 선택 핸들러 (선택된 맛집이 현재 필터에 가려진 경우 필터를 자동 해제하여 화면에서 즉시 닫히지 않도록 방지)
@@ -488,7 +511,7 @@ export default function App() {
         setSearchQuery('');
       }
 
-      // 4. 식당 이미지가 없을 경우 실시간 온디맨드 크롤링 (Cycle 26)
+      // 4. 식당 이미지가 없을 경우 실시간 온디맨드 크롤링 (Cycle 26) - 검색 실패 시 'no_image' 캐싱 추가 (Bug 51)
       if (!restaurant.image) {
         const crawlQuery = restaurant.portalSearchName || `${restaurant.city || restaurant.region || ''} ${restaurant.name}`;
         fetch(`/api/crawl-image?query=${encodeURIComponent(crawlQuery)}`)
@@ -497,19 +520,22 @@ export default function App() {
             throw new Error('Crawl failed');
           })
           .then(data => {
-            if (data.image) {
-              setRestaurants(prev => {
-                const next = prev.map(r => {
-                  if (r.id === restaurant.id) {
-                    return { ...r, image: data.image };
-                  }
-                  return r;
-                });
-                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next));
-                return next;
+            const resolvedImage = data.image || 'no_image';
+            setRestaurants(prev => {
+              const next = prev.map(r => {
+                if (r.id === restaurant.id) {
+                  return { ...r, image: resolvedImage };
+                }
+                return r;
               });
-              setSelectedRestaurant(prev => prev && prev.id === restaurant.id ? { ...prev, image: data.image } : prev);
-            }
+              try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(next));
+              } catch (e) {
+                console.error('Failed to save to localStorage:', e);
+              }
+              return next;
+            });
+            setSelectedRestaurant(prev => prev && prev.id === restaurant.id ? { ...prev, image: resolvedImage } : prev);
           })
           .catch(err => {
             console.error('Failed to crawl image on the fly:', err);

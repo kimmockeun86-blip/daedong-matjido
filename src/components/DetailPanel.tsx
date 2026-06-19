@@ -248,7 +248,8 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
   // 상호명 기반 고정 이미지 인덱스 결정
   const imageList = CATEGORY_IMAGES[restaurant.category] || CATEGORY_IMAGES['기타'];
   const imageIndex = Math.abs(restaurant.name.split('').reduce((acc, curr) => acc + curr.charCodeAt(0), 0)) % imageList.length;
-  const headerImage = restaurant.image || imageList[imageIndex];
+  const headerImage = (restaurant.image && restaurant.image !== 'no_image') ? restaurant.image : imageList[imageIndex];
+
 
   // 카테고리별 뱃지 컬러 테마 지정
   let badgeBg = 'rgba(249, 115, 22, 0.9)';
