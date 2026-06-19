@@ -29,6 +29,7 @@ const ensureRestaurantIds = (data: Partial<RestaurantRaw>[]): RestaurantRaw[] =>
       portalSearchName: res.portalSearchName,
       region: res.region,
       city: res.city,
+      image: res.image,
       id
     };
   });

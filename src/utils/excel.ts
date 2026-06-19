@@ -13,6 +13,7 @@ export interface RestaurantRaw {
   portalSearchName?: string;
   region?: string;
   city?: string;
+  image?: string;
 }
 
 // 샘플 데이터 구조
@@ -107,6 +108,9 @@ interface ExcelRow {
   latitude?: string | number;
   경도?: string | number;
   longitude?: string | number;
+  이미지?: string;
+  image?: string;
+  사진?: string;
 }
 
 /**
@@ -163,6 +167,7 @@ export function parseExcelFile(file: File): Promise<RestaurantRaw[]> {
 
           const nameTrimmed = String(name).trim();
           const id = `${nameTrimmed}_${addressStr || idx}`.replace(/\s+/g, '_');
+          const imageVal = String(row['이미지'] || row['image'] || row['사진'] || '').trim();
 
           return {
             id,
@@ -176,7 +181,8 @@ export function parseExcelFile(file: File): Promise<RestaurantRaw[]> {
             menu: String(menu).trim(),
             portalSearchName: String(portalSearchName).trim(),
             region: String(region).trim(),
-            city: String(city).trim()
+            city: String(city).trim(),
+            image: imageVal || undefined
           };
         });
 
