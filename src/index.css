@@ -85,6 +85,10 @@ body, html, #root {
 }
 
 /* Custom Scrollbars */
+* {
+  scrollbar-width: thin;
+}
+
 ::-webkit-scrollbar {
   width: 5px;
   height: 5px;
@@ -101,6 +105,23 @@ body, html, #root {
 
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent-cyan);
+}
+
+/* Firefox compatibility */
+* {
+  scrollbar-color: rgba(255, 255, 255, 0.08) rgba(0, 0, 0, 0.2);
+}
+
+.theme-cyberpunk * {
+  scrollbar-color: rgba(6, 182, 212, 0.25) rgba(3, 7, 18, 0.4);
+}
+
+.theme-smooth * {
+  scrollbar-color: rgba(139, 92, 246, 0.3) rgba(15, 23, 42, 0.4);
+}
+
+.theme-light * {
+  scrollbar-color: rgba(148, 163, 184, 0.5) rgba(241, 245, 249, 0.5);
 }
 
 /* Premium Scrollbar Skins by Theme */

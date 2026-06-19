@@ -69,6 +69,8 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   '기타': '🍽️'
 };
 
+const categories = ['전체', '한식', '중식', '일식', '양식', '분식', '육류', '기타'];
+
 export default function Sidebar({
   restaurants,
   filteredRestaurants,
@@ -98,7 +100,6 @@ export default function Sidebar({
   const isShufflingRef = useRef(false);
 
   // 고유 카테고리 추출
-  const categories = ['전체', '한식', '중식', '일식', '양식', '분식', '육류'];
 
   // 동적 지역별 분포 계산
   const regionsSorted = useMemo(() => {
@@ -187,10 +188,10 @@ export default function Sidebar({
   const handleShakeTrigger = async () => {
     if (
       typeof DeviceMotionEvent !== 'undefined' &&
-      typeof (DeviceMotionEvent as any).requestPermission === 'function'
+      typeof (DeviceMotionEvent as unknown as { requestPermission?: () => Promise<string> }).requestPermission === 'function'
     ) {
       try {
-        const permissionState = await (DeviceMotionEvent as any).requestPermission();
+        const permissionState = await (DeviceMotionEvent as unknown as { requestPermission: () => Promise<string> }).requestPermission();
         if (permissionState === 'granted') {
           triggerShake();
         } else {
@@ -399,625 +400,636 @@ export default function Sidebar({
           display: 'flex', 
           flexDirection: 'column', 
           height: '100%', 
-          gap: '16px', 
           width: '100%',
-          overflowY: 'hidden',
-          paddingRight: '6px'
+          overflow: 'hidden'
         }}>
           
-          {/* 최상단 헤더 영역 */}
-          <div>
-            <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--accent-orange)', letterSpacing: '0.15em', marginBottom: '2px' }}>
-              大東味地圖
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-              <div>
-                <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#f8fafc', letterSpacing: '-0.03em', lineHeight: '1.1' }}>
-                  대동맛지도
-                </h1>
-                <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px', fontWeight: '500' }}>
-                  전국 방방곡곡의 면밀한 맛집 탐색기
-                </p>
+          {/* 1. 고정 영역 (Sticky Header): 헤더 + 검색창 + 카테고리/지역 필터 + 검색결과 카운트 */}
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '12px',
+            flexShrink: 0,
+            paddingBottom: '12px',
+            borderBottom: '1px solid rgba(255,255,255,0.06)',
+            width: '100%'
+          }}>
+            {/* 최상단 헤더 영역 */}
+            <div>
+              <div style={{ fontSize: '10px', fontWeight: '800', color: 'var(--accent-orange)', letterSpacing: '0.15em', marginBottom: '2px' }}>
+                大東味地圖
               </div>
-              
-              {/* 우측 조작 버튼 그룹 */}
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-                {/* 목록 비우기 리셋 버튼 */}
-                <button
-                  onClick={onResetData}
-                  style={{
-                    fontSize: '11px',
-                    color: '#ef4444',
-                    background: 'rgba(239, 68, 68, 0.08)',
-                    border: '1px solid rgba(239, 68, 68, 0.15)',
-                    borderRadius: '6px',
-                    padding: '4px 8px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    transition: 'all 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
-                >
-                  목록 비우기
-                </button>
-
-                {/* 모바일 버전 전용 접기 버튼 */}
-                {isMobile && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <h1 style={{ fontSize: '28px', fontWeight: '900', color: '#f8fafc', letterSpacing: '-0.03em', lineHeight: '1.1' }}>
+                    대동맛지도
+                  </h1>
+                  <p style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px', fontWeight: '500' }}>
+                    전국 방방곡곡의 면밀한 맛집 탐색기
+                  </p>
+                </div>
+                
+                {/* 우측 조작 버튼 그룹 */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  {/* 목록 비우기 리셋 버튼 */}
                   <button
-                    onClick={() => setIsCollapsed(true)}
+                    onClick={onResetData}
                     style={{
                       fontSize: '11px',
-                      color: '#f8fafc',
-                      background: 'rgba(255, 255, 255, 0.05)',
-                      border: '1px solid var(--border-glass)',
+                      color: '#ef4444',
+                      background: 'rgba(239, 68, 68, 0.08)',
+                      border: '1px solid rgba(239, 68, 68, 0.15)',
                       borderRadius: '6px',
                       padding: '4px 8px',
                       fontWeight: '600',
                       cursor: 'pointer',
                       transition: 'all 0.2s'
                     }}
-                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
-                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.08)'}
                   >
-                    접기
+                    목록 비우기
                   </button>
-                )}
-              </div>
-            </div>
-          </div>
 
-          {/* 7년 실방문 보증 네온 배너 (데스크톱 전용) */}
-          {!isMobile && (
-            <div style={{
-              background: 'linear-gradient(90deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 179, 8, 0.05) 100%)',
-              border: '1px solid rgba(249, 115, 22, 0.3)',
-              borderRadius: '10px',
-              padding: '10px 14px',
-              fontSize: '12px',
-              lineHeight: '1.4',
-              color: '#ffedd5',
-              fontWeight: '600',
-              boxShadow: '0 0 10px rgba(249, 115, 22, 0.1)',
-              flexShrink: 0
-            }}>
-              🍊 <span style={{ color: 'var(--accent-orange)', fontWeight: '800' }}>7년 간 직접 가본 맛집으로만 만든 최고의 대동맛지도!</span>
-              <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: '500' }}>
-                광고나 홍보 대가 없는 순도 100% 현지인 검증 노포/맛집 824곳을 조망하세요.
-              </div>
-            </div>
-          )}
-
-          {/* 검색창 */}
-          <div style={{ position: 'relative', width: '100%', flexShrink: 0 }}>
-            <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input
-              type="text"
-              placeholder="식당명, 메뉴, 지역, 키워드로 서치..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              style={{
-                width: '100%',
-                padding: '11px 12px 11px 36px',
-                background: 'rgba(15, 23, 42, 0.5)',
-                border: '1px solid var(--border-glass)',
-                borderRadius: '8px',
-                color: 'var(--text-primary)',
-                fontSize: '13px',
-                outline: 'none',
-                transition: 'border-color 0.2s'
-              }}
-              onFocus={(e) => e.target.style.borderColor = 'var(--accent-cyan)'}
-              onBlur={(e) => e.target.style.borderColor = 'var(--border-glass)'}
-            />
-          </div>
-
-          {/* GPS 및 맛집 제보 버튼 그룹 */}
-          <div style={{ display: 'flex', gap: '8px', width: '100%', flexShrink: 0 }}>
-            <button
-              onClick={onGPSClick}
-              style={{
-                flex: 1.2,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                border: '1px solid var(--accent-yellow)',
-                background: 'rgba(234, 179, 8, 0.03)',
-                color: 'var(--accent-yellow)',
-                borderRadius: '8px',
-                padding: '11px 0',
-                fontSize: '12px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(234, 179, 8, 0.1)';
-                e.currentTarget.style.boxShadow = '0 0 10px rgba(234, 179, 8, 0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(234, 179, 8, 0.03)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              <Navigation size={13} style={{ transform: 'rotate(45deg)' }} />
-              내 주변 맛집 (GPS)
-            </button>
-
-            <button
-              onClick={() => setShowReportModal(true)}
-              style={{
-                flex: 0.8,
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                gap: '6px',
-                border: '1px solid var(--accent-orange)',
-                background: 'rgba(249, 115, 22, 0.03)',
-                color: 'var(--accent-orange)',
-                borderRadius: '8px',
-                padding: '11px 0',
-                fontSize: '12px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(249, 115, 22, 0.1)';
-                e.currentTarget.style.boxShadow = '0 0 10px rgba(249, 115, 22, 0.2)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(249, 115, 22, 0.03)';
-                e.currentTarget.style.boxShadow = 'none';
-              }}
-            >
-              ✍️ 맛집 제보
-            </button>
-          </div>
-
-          {/* 지하철역 기준 중간지점 맛집 검색 */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-            <button
-              onClick={() => setShowStationSearch(!showStationSearch)}
-              style={{
-                width: '100%',
-                background: 'rgba(6, 182, 212, 0.03)',
-                border: '1px solid rgba(6, 182, 212, 0.25)',
-                color: 'var(--accent-cyan)',
-                borderRadius: '8px',
-                padding: '8px 12px',
-                fontSize: '12px',
-                fontWeight: '700',
-                cursor: 'pointer',
-                textAlign: 'left',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center'
-              }}
-            >
-              <span>🚇 중간지점 맛집 찾기</span>
-              <span>{showStationSearch ? '▼' : '▶'}</span>
-            </button>
-
-            {showStationSearch && (
-              <div 
-                className="animate-fade-in"
-                style={{
-                  background: 'rgba(15, 23, 42, 0.4)',
-                  border: '1px solid var(--border-glass)',
-                  padding: '12px',
-                  borderRadius: '8px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px'
-                }}
-              >
-                <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
-                  친구와 나의 중간 지점(예: 신도림, 강남, 홍대 등) 맛집을 탐색합니다.
-                </div>
-                <div style={{ display: 'flex', gap: '6px' }}>
-                  <input 
-                    type="text" 
-                    placeholder="출발지 1 (예: 강남)"
-                    value={station1}
-                    onChange={(e) => setStation1(e.target.value)}
-                    style={{ flex: 1, padding: '6px 8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-glass)', borderRadius: '6px', color: '#fff', fontSize: '11px', outline: 'none' }}
-                  />
-                  <input 
-                    type="text" 
-                    placeholder="출발지 2 (예: 신촌)"
-                    value={station2}
-                    onChange={(e) => setStation2(e.target.value)}
-                    style={{ flex: 1, padding: '6px 8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-glass)', borderRadius: '6px', color: '#fff', fontSize: '11px', outline: 'none' }}
-                  />
-                </div>
-                <button
-                  onClick={handleStationSearch}
-                  style={{
-                    padding: '8px 0',
-                    background: 'var(--accent-cyan)',
-                    color: '#020617',
-                    border: 'none',
-                    borderRadius: '6px',
-                    fontSize: '11px',
-                    fontWeight: '800',
-                    cursor: 'pointer'
-                  }}
-                >
-                  중간영역 검색 및 이동
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* 카테고리 & 지역 필터 (모바일에서는 콤팩트 select 콤보박스로 1열 정렬, 데스크톱에서는 기존의 뱃지 레이아웃) */}
-          {isMobile ? (
-            <div style={{ display: 'flex', gap: '8px', width: '100%', flexShrink: 0 }}>
-              {/* 카테고리 셀렉트 */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '10px', fontWeight: '800', color: 'var(--accent-yellow)', letterSpacing: '0.05em' }}>음식 카테고리</label>
-                <select
-                  value={selectedCategory}
-                  onChange={(e) => setSelectedCategory(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    background: 'rgba(15, 23, 42, 0.75)',
-                    border: '1.5px solid var(--accent-yellow)',
-                    borderRadius: '8px',
-                    color: '#fff',
-                    fontSize: '12px',
-                    fontWeight: '700',
-                    outline: 'none',
-                    boxShadow: '0 0 10px rgba(234, 179, 8, 0.1)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  {categories.map((cat, idx) => (
-                    <option key={idx} value={cat} style={{ background: '#0f172a', color: '#fff' }}>
-                      {(CATEGORY_EMOJIS[cat] || '🍽️') + ' ' + cat}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* 지역 셀렉트 */}
-              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                <label style={{ fontSize: '10px', fontWeight: '800', color: 'var(--accent-cyan)', letterSpacing: '0.05em' }}>지역 분포 필터</label>
-                <select
-                  value={selectedRegion}
-                  onChange={(e) => setSelectedRegion(e.target.value)}
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    background: 'rgba(15, 23, 42, 0.75)',
-                    border: '1.5px solid var(--accent-cyan)',
-                    borderRadius: '8px',
-                    color: '#fff',
-                    fontSize: '12px',
-                    fontWeight: '700',
-                    outline: 'none',
-                    boxShadow: '0 0 10px rgba(6, 182, 212, 0.1)',
-                    cursor: 'pointer'
-                  }}
-                >
-                  <option value="전체" style={{ background: '#0f172a', color: '#fff' }}>
-                    전체 ({restaurants.length})
-                  </option>
-                  {regionsSorted.map((reg, idx) => (
-                    <option key={idx} value={reg.name} style={{ background: '#0f172a', color: '#fff' }}>
-                      {reg.name} ({reg.count})
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          ) : (
-            <>
-              {/* 카테고리 필터 (뱃지 스타일) */}
-              <div style={{
-                display: 'flex',
-                flexWrap: 'wrap',
-                gap: '6px',
-                width: '100%'
-              }}>
-                {categories.map((cat, idx) => {
-                  const isActive = selectedCategory === cat;
-                  const emoji = CATEGORY_EMOJIS[cat] || '🍽️';
-                  return (
+                  {/* 모바일 버전 전용 접기 버튼 */}
+                  {isMobile && (
                     <button
-                      key={idx}
-                      onClick={() => setSelectedCategory(cat)}
+                      onClick={() => setIsCollapsed(true)}
                       style={{
-                        whiteSpace: 'nowrap',
-                        padding: '7px 13px',
-                        borderRadius: '8px',
-                        border: '1px solid',
-                        borderColor: isActive ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.06)',
-                        background: isActive ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.03)',
-                        color: isActive ? '#0f172a' : 'var(--text-secondary)',
-                        fontSize: '12px',
-                        fontWeight: '700',
+                        fontSize: '11px',
+                        color: '#f8fafc',
+                        background: 'rgba(255, 255, 255, 0.05)',
+                        border: '1px solid var(--border-glass)',
+                        borderRadius: '6px',
+                        padding: '4px 8px',
+                        fontWeight: '600',
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px'
+                        transition: 'all 0.2s'
                       }}
+                      onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.1)'}
+                      onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255, 255, 255, 0.05)'}
                     >
-                      <span>{emoji}</span>
-                      <span>{cat}</span>
+                      접기
                     </button>
-                  );
-                })}
-              </div>
-
-              {/* 지역별 맛도리 분포 필터 버튼 */}
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Compass size={12} style={{ color: 'var(--accent-cyan)' }} />
-                  지역별 맛도리 분포
+                  )}
                 </div>
-                <div style={{ 
-                  display: 'flex', 
-                  gap: '6px', 
-                  flexWrap: 'wrap', 
-                  paddingBottom: '2px' 
-                }}>
-                  {/* 전체 지역 지역 버튼 */}
-                  <button
-                    onClick={() => setSelectedRegion('전체')}
+              </div>
+            </div>
+
+            {/* 검색창 */}
+            <div style={{ position: 'relative', width: '100%' }}>
+              <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                placeholder="식당명, 메뉴, 지역, 키워드로 서치..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                style={{
+                  width: '100%',
+                  padding: '11px 12px 11px 36px',
+                  background: 'rgba(15, 23, 42, 0.5)',
+                  border: '1px solid var(--border-glass)',
+                  borderRadius: '8px',
+                  color: 'var(--text-primary)',
+                  fontSize: '13px',
+                  outline: 'none',
+                  transition: 'border-color 0.2s'
+                }}
+                onFocus={(e) => e.target.style.borderColor = 'var(--accent-cyan)'}
+                onBlur={(e) => e.target.style.borderColor = 'var(--border-glass)'}
+              />
+            </div>
+
+            {/* 카테고리 & 지역 필터 (모바일에서는 콤팩트 select 콤보박스로 1열 정렬, 데스크톱에서는 기존의 뱃지 레이아웃) */}
+            {isMobile ? (
+              <div style={{ display: 'flex', gap: '8px', width: '100%', flexShrink: 0 }}>
+                {/* 카테고리 셀렉트 */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: 'var(--accent-yellow)', letterSpacing: '0.05em' }}>음식 카테고리</label>
+                  <select
+                    value={selectedCategory}
+                    onChange={(e) => setSelectedCategory(e.target.value)}
                     style={{
-                      whiteSpace: 'nowrap',
-                      padding: '6px 10px',
-                      borderRadius: '6px',
-                      border: '1px solid',
-                      borderColor: selectedRegion === '전체' ? 'var(--accent-cyan)' : 'rgba(255,255,255,0.04)',
-                      background: selectedRegion === '전체' ? 'rgba(6, 182, 212, 0.12)' : 'rgba(255,255,255,0.02)',
-                      color: selectedRegion === '전체' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-                      fontSize: '11px',
-                      fontWeight: '600',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '4px'
+                      width: '100%',
+                      padding: '10px',
+                      background: 'rgba(15, 23, 42, 0.75)',
+                      border: '1.5px solid var(--accent-yellow)',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      outline: 'none',
+                      boxShadow: '0 0 10px rgba(234, 179, 8, 0.1)',
+                      cursor: 'pointer'
                     }}
                   >
-                    <span>전체</span>
-                    <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '4px', color: '#94a3b8' }}>
-                      {restaurants.length}
-                    </span>
-                  </button>
+                    {categories.map((cat, idx) => (
+                      <option key={idx} value={cat} style={{ background: '#0f172a', color: '#fff' }}>
+                        {(CATEGORY_EMOJIS[cat] || '🍽️') + ' ' + cat}
+                      </option>
+                    ))}
+                  </select>
+                </div>
 
-                  {/* 정렬된 지역 버튼 렌더링 */}
-                  {regionsSorted.map((reg, idx) => {
-                    const isActive = selectedRegion === reg.name;
+                {/* 지역 셀렉트 */}
+                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                  <label style={{ fontSize: '10px', fontWeight: '800', color: 'var(--accent-cyan)', letterSpacing: '0.05em' }}>지역 분포 필터</label>
+                  <select
+                    value={selectedRegion}
+                    onChange={(e) => setSelectedRegion(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      background: 'rgba(15, 23, 42, 0.75)',
+                      border: '1.5px solid var(--accent-cyan)',
+                      borderRadius: '8px',
+                      color: '#fff',
+                      fontSize: '12px',
+                      fontWeight: '700',
+                      outline: 'none',
+                      boxShadow: '0 0 10px rgba(6, 182, 212, 0.1)',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    <option value="전체" style={{ background: '#0f172a', color: '#fff' }}>
+                      전체 ({restaurants.length})
+                    </option>
+                    {regionsSorted.map((reg, idx) => (
+                      <option key={idx} value={reg.name} style={{ background: '#0f172a', color: '#fff' }}>
+                        {reg.name} ({reg.count})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* 카테고리 필터 (뱃지 스타일) */}
+                <div style={{
+                  display: 'flex',
+                  flexWrap: 'wrap',
+                  gap: '6px',
+                  width: '100%'
+                }}>
+                  {categories.map((cat, idx) => {
+                    const isActive = selectedCategory === cat;
+                    const emoji = CATEGORY_EMOJIS[cat] || '🍽️';
                     return (
                       <button
                         key={idx}
-                        onClick={() => setSelectedRegion(reg.name)}
+                        onClick={() => setSelectedCategory(cat)}
                         style={{
                           whiteSpace: 'nowrap',
-                          padding: '6px 10px',
-                          borderRadius: '6px',
+                          padding: '7px 13px',
+                          borderRadius: '8px',
                           border: '1px solid',
-                          borderColor: isActive ? 'var(--accent-cyan)' : 'rgba(255,255,255,0.04)',
-                          background: isActive ? 'rgba(6, 182, 212, 0.12)' : 'rgba(255,255,255,0.02)',
-                          color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
-                          fontSize: '11px',
-                          fontWeight: '600',
+                          borderColor: isActive ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.06)',
+                          background: isActive ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.03)',
+                          color: isActive ? '#0f172a' : 'var(--text-secondary)',
+                          fontSize: '12px',
+                          fontWeight: '700',
                           cursor: 'pointer',
+                          transition: 'all 0.2s',
                           display: 'flex',
                           alignItems: 'center',
                           gap: '4px'
                         }}
                       >
-                        <span>{reg.name}</span>
-                        <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '4px', color: '#94a3b8' }}>
-                          {reg.count}
-                        </span>
+                        <span>{emoji}</span>
+                        <span>{cat}</span>
                       </button>
                     );
                   })}
                 </div>
-              </div>
-            </>
-          ) }
 
-          {/* 흔들어서 결정 (Shake/Shuffle) 버튼 */}
-          <div style={{ display: 'flex', gap: '8px', width: '100%', flexShrink: 0 }}>
-            <button
-              onClick={handleShakeTrigger}
-              className="animate-pulse-cyan"
-              style={{
-                width: '100%',
-                background: 'linear-gradient(90deg, rgba(236, 72, 153, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
-                border: '1.5px dashed var(--accent-pink)',
-                color: '#ffffff',
-                borderRadius: '8px',
-                padding: '10px 14px',
-                fontSize: '13px',
-                fontWeight: '800',
-                cursor: 'pointer',
-                textAlign: 'center',
-                display: 'flex',
-                justifyContent: 'center',
-                alignItems: 'center',
-                gap: '8px',
-                boxShadow: '0 0 12px rgba(236, 72, 153, 0.15)',
-                transition: 'all 0.2s'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(236, 72, 153, 0.18)';
-                e.currentTarget.style.borderColor = 'var(--accent-pink)';
-                e.currentTarget.style.boxShadow = '0 0 20px rgba(236, 72, 153, 0.35)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(236, 72, 153, 0.1)';
-                e.currentTarget.style.borderColor = 'rgba(236, 72, 153, 0.5)';
-                e.currentTarget.style.boxShadow = '0 0 12px rgba(236, 72, 153, 0.15)';
-              }}
-            >
-              <span>📳</span>
-              <span>휴대폰 흔들기 또는 랜덤 셔플 🎲</span>
-            </button>
-          </div>
+                {/* 지역별 맛도리 분포 필터 버튼 */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Compass size={12} style={{ color: 'var(--accent-cyan)' }} />
+                    지역별 맛도리 분포
+                  </div>
+                  <div style={{ 
+                    display: 'flex', 
+                    gap: '6px', 
+                    flexWrap: 'wrap', 
+                    paddingBottom: '2px' 
+                  }}>
+                    {/* 전체 지역 지역 버튼 */}
+                    <button
+                      onClick={() => setSelectedRegion('전체')}
+                      style={{
+                        whiteSpace: 'nowrap',
+                        padding: '6px 10px',
+                        borderRadius: '6px',
+                        border: '1px solid',
+                        borderColor: selectedRegion === '전체' ? 'var(--accent-cyan)' : 'rgba(255,255,255,0.04)',
+                        background: selectedRegion === '전체' ? 'rgba(6, 182, 212, 0.12)' : 'rgba(255,255,255,0.02)',
+                        color: selectedRegion === '전체' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                        fontSize: '11px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}
+                    >
+                      <span>전체</span>
+                      <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '4px', color: '#94a3b8' }}>
+                        {restaurants.length}
+                      </span>
+                    </button>
 
-          {/* 전체 분석 리포트 카드 (데스크톱 전용) */}
-          {!isMobile && (
-            <div style={{
-              background: 'rgba(139, 92, 246, 0.03)',
-              border: '1px solid rgba(139, 92, 246, 0.18)',
-              borderRadius: '10px',
-              padding: '12px 14px',
-              display: 'flex',
-              flexDirection: 'column',
-              gap: '8px'
-            }}>
-              <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <BarChart3 size={12} />
-                전체 분석리포트
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px', color: 'var(--text-secondary)' }}>
-                <div>
-                  강세 카테고리: <span style={{ color: '#f8fafc', fontWeight: '600' }}>한식(571곳), 기타(114곳)</span>
+                    {/* 정렬된 지역 버튼 렌더링 */}
+                    {regionsSorted.map((reg, idx) => {
+                      const isActive = selectedRegion === reg.name;
+                      return (
+                        <button
+                          key={idx}
+                          onClick={() => setSelectedRegion(reg.name)}
+                          style={{
+                            whiteSpace: 'nowrap',
+                            padding: '6px 10px',
+                            borderRadius: '6px',
+                            border: '1px solid',
+                            borderColor: isActive ? 'var(--accent-cyan)' : 'rgba(255,255,255,0.04)',
+                            background: isActive ? 'rgba(6, 182, 212, 0.12)' : 'rgba(255,255,255,0.02)',
+                            color: isActive ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                            fontSize: '11px',
+                            fontWeight: '600',
+                            cursor: 'pointer',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '4px'
+                          }}
+                        >
+                          <span>{reg.name}</span>
+                          <span style={{ fontSize: '9px', background: 'rgba(255,255,255,0.08)', padding: '1px 4px', borderRadius: '4px', color: '#94a3b8' }}>
+                            {reg.count}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-                <div>
-                  추천 대표메뉴: <span style={{ color: '#f8fafc', fontWeight: '600' }}>양꼬치, 돈까스, 매운탕</span>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* 스폰서 광고 슬롯 (데스크톱 전용) */}
-          {!isMobile && (
-            <div className="ad-slot-box">
-              <span style={{
-                position: 'absolute',
-                top: '6px',
-                right: '8px',
-                fontSize: '8px',
-                fontWeight: '700',
-                color: 'var(--accent-yellow)',
-                letterSpacing: '0.08em',
-                background: 'rgba(234, 179, 8, 0.08)',
-                padding: '1px 4px',
-                borderRadius: '3px'
-              }}>
-                SPONSOR
-              </span>
-              <div style={{ color: '#f8fafc', fontSize: '12px', fontWeight: '700', marginBottom: '2px' }}>
-                광고 영역 (Ad Slot)
-              </div>
-              <div style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>
-                구글 애드센스 광고가 게재될 공간입니다.
-              </div>
-            </div>
-          )}
-
-          {/* 🎮 미식 툴킷 즐길거리 (Interactive Tools) */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
-            <button
-              onClick={() => setShowToolkitSection(!showToolkitSection)}
-              style={{
-                width: '100%',
-                background: 'linear-gradient(90deg, rgba(6, 182, 212, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
-                border: '1px solid rgba(6, 182, 212, 0.35)',
-                color: '#f8fafc',
-                borderRadius: '8px',
-                padding: '10px 14px',
-                fontSize: '13px',
-                fontWeight: '800',
-                cursor: 'pointer',
-                textAlign: 'left',
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                boxShadow: '0 0 10px rgba(6, 182, 212, 0.1)'
-              }}
-            >
-              <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                🎮 대동맛지도 미식 툴킷 <span style={{ fontSize: '10px', fontWeight: '500', color: 'var(--accent-cyan)' }}>INTERACTIVE</span>
-              </span>
-              <span>{showToolkitSection ? '▼' : '▶'}</span>
-            </button>
-
-            {showToolkitSection && (
-              <div 
-                className="animate-fade-in"
-                style={{
-                  background: 'rgba(15, 23, 42, 0.45)',
-                  border: '1px solid var(--border-glass)',
-                  padding: '12px',
-                  borderRadius: '10px',
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(2, 1fr)',
-                  gap: '8px'
-                }}
-              >
-                {([
-                  { id: 'roulette', name: '맛집 룰렛', icon: '🎯', desc: '결정장애 해소' },
-                  { id: 'mbti', name: '미식 MBTI', icon: '🧠', desc: '스와이프 성향분석' },
-                  { id: 'couple', name: '커플 궁합', icon: '👩‍❤️‍👨', desc: '데이트 식당 매칭' },
-                  { id: 'worldcup', name: '이상형 월드컵', icon: '🏆', desc: '최애 노포 8강전' },
-                  { id: 'share', name: '약속 메이커', icon: '💬', desc: '초대장 공유' },
-                  { id: 'instagram', name: '인스타 카드', icon: '📸', desc: '인증서&Wrapped' },
-                  { id: 'quiz', name: '미식 퀴즈', icon: '✏️', desc: '역사 맞추기' },
-                  { id: 'shop', name: '기프트 샵', icon: '🎁', desc: '대동 굿즈' }
-                ] as const).map((item) => (
-                  <button
-                    key={item.id}
-                    onClick={() => onOpenToolkitTab?.(item.id)}
-                    style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      background: 'rgba(30, 41, 59, 0.4)',
-                      border: '1px solid rgba(255,255,255,0.04)',
-                      borderRadius: '8px',
-                      padding: '8px 10px',
-                      cursor: 'pointer',
-                      textAlign: 'left',
-                      transition: 'all 0.2s'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.currentTarget.style.borderColor = 'var(--accent-cyan)';
-                      e.currentTarget.style.background = 'rgba(6, 182, 212, 0.05)';
-                      e.currentTarget.style.transform = 'translateY(-1px)';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
-                      e.currentTarget.style.background = 'rgba(30, 41, 59, 0.4)';
-                      e.currentTarget.style.transform = 'translateY(0)';
-                    }}
-                  >
-                    <span style={{ fontSize: '20px' }}>{item.icon}</span>
-                    <div style={{ display: 'flex', flexDirection: 'column' }}>
-                      <span style={{ fontSize: '11px', fontWeight: '800', color: '#f8fafc' }}>{item.name}</span>
-                      <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>{item.desc}</span>
-                    </div>
-                  </button>
-                ))}
-              </div>
+              </>
             )}
+
+            {/* 검색 결과 카운트 정보 */}
+            <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
+              검색된 맛집 <span style={{ color: 'var(--accent-yellow)' }}>{filteredRestaurants.length}</span>개
+            </div>
           </div>
 
-          {/* 검색 결과 카운트 정보 */}
-          <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
-            검색된 맛집 <span style={{ color: 'var(--accent-yellow)' }}>{filteredRestaurants.length}</span>개
-          </div>
-
-          {/* 스크롤 리스트 영역 */}
+          {/* 2. 스크롤 영역 (Scrollable Content): 나머지 기능 위젯 + 맛집 리스트 */}
           <div style={{
             flex: 1,
             overflowY: 'auto',
             display: 'flex',
             flexDirection: 'column',
-            gap: '12px',
+            gap: '16px',
+            paddingTop: '12px',
             paddingRight: '4px',
             minHeight: 0
           }}>
+            {/* 7년 실방문 보증 네온 배너 (데스크톱 전용) */}
+            {!isMobile && (
+              <div style={{
+                background: 'linear-gradient(90deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 179, 8, 0.05) 100%)',
+                border: '1px solid rgba(249, 115, 22, 0.3)',
+                borderRadius: '10px',
+                padding: '10px 14px',
+                fontSize: '12px',
+                lineHeight: '1.4',
+                color: '#ffedd5',
+                fontWeight: '600',
+                boxShadow: '0 0 10px rgba(249, 115, 22, 0.1)',
+                flexShrink: 0
+              }}>
+                🍊 <span style={{ color: 'var(--accent-orange)', fontWeight: '800' }}>7년 간 직접 가본 맛집으로만 만든 최고의 대동맛지도!</span>
+                <div style={{ fontSize: '10px', color: 'var(--text-secondary)', marginTop: '2px', fontWeight: '500' }}>
+                  광고나 홍보 대가 없는 순도 100% 현지인 검증 노포/맛집 824곳을 조망하세요.
+                </div>
+              </div>
+            )}
+
+            {/* GPS 및 맛집 제보 버튼 그룹 */}
+            <div style={{ display: 'flex', gap: '8px', width: '100%', flexShrink: 0 }}>
+              <button
+                onClick={onGPSClick}
+                style={{
+                  flex: 1.2,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  border: '1px solid var(--accent-yellow)',
+                  background: 'rgba(234, 179, 8, 0.03)',
+                  color: 'var(--accent-yellow)',
+                  borderRadius: '8px',
+                  padding: '11px 0',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(234, 179, 8, 0.1)';
+                  e.currentTarget.style.boxShadow = '0 0 10px rgba(234, 179, 8, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(234, 179, 8, 0.03)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                <Navigation size={13} style={{ transform: 'rotate(45deg)' }} />
+                내 주변 맛집 (GPS)
+              </button>
+
+              <button
+                onClick={() => setShowReportModal(true)}
+                style={{
+                  flex: 0.8,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '6px',
+                  border: '1px solid var(--accent-orange)',
+                  background: 'rgba(249, 115, 22, 0.03)',
+                  color: 'var(--accent-orange)',
+                  borderRadius: '8px',
+                  padding: '11px 0',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(249, 115, 22, 0.1)';
+                  e.currentTarget.style.boxShadow = '0 0 10px rgba(249, 115, 22, 0.2)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(249, 115, 22, 0.03)';
+                  e.currentTarget.style.boxShadow = 'none';
+                }}
+              >
+                ✍️ 맛집 제보
+              </button>
+            </div>
+
+            {/* 지하철역 기준 중간지점 맛집 검색 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowStationSearch(!showStationSearch)}
+                style={{
+                  width: '100%',
+                  background: 'rgba(6, 182, 212, 0.03)',
+                  border: '1px solid rgba(6, 182, 212, 0.25)',
+                  color: 'var(--accent-cyan)',
+                  borderRadius: '8px',
+                  padding: '8px 12px',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center'
+                }}
+              >
+                <span>🚇 중간지점 맛집 찾기</span>
+                <span>{showStationSearch ? '▼' : '▶'}</span>
+              </button>
+
+              {showStationSearch && (
+                <div 
+                  className="animate-fade-in"
+                  style={{
+                    background: 'rgba(15, 23, 42, 0.4)',
+                    border: '1px solid var(--border-glass)',
+                    padding: '12px',
+                    borderRadius: '8px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '8px'
+                  }}
+                >
+                  <div style={{ fontSize: '10px', color: 'var(--text-secondary)' }}>
+                    친구와 나의 중간 지점(예: 신도림, 강남, 홍대 등) 맛집을 탐색합니다.
+                  </div>
+                  <div style={{ display: 'flex', gap: '6px' }}>
+                    <input 
+                      type="text" 
+                      placeholder="출발지 1 (예: 강남)"
+                      value={station1}
+                      onChange={(e) => setStation1(e.target.value)}
+                      style={{ flex: 1, padding: '6px 8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-glass)', borderRadius: '6px', color: '#fff', fontSize: '11px', outline: 'none' }}
+                    />
+                    <input 
+                      type="text" 
+                      placeholder="출발지 2 (예: 신촌)"
+                      value={station2}
+                      onChange={(e) => setStation2(e.target.value)}
+                      style={{ flex: 1, padding: '6px 8px', background: 'rgba(0,0,0,0.3)', border: '1px solid var(--border-glass)', borderRadius: '6px', color: '#fff', fontSize: '11px', outline: 'none' }}
+                    />
+                  </div>
+                  <button
+                    onClick={handleStationSearch}
+                    style={{
+                      padding: '8px 0',
+                      background: 'var(--accent-cyan)',
+                      color: '#020617',
+                      border: 'none',
+                      borderRadius: '6px',
+                      fontSize: '11px',
+                      fontWeight: '800',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    중간영역 검색 및 이동
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* 흔들어서 결정 (Shake/Shuffle) 버튼 */}
+            <div style={{ display: 'flex', gap: '8px', width: '100%', flexShrink: 0 }}>
+              <button
+                onClick={handleShakeTrigger}
+                className="animate-pulse-cyan"
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(90deg, rgba(236, 72, 153, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
+                  border: '1.5px dashed var(--accent-pink)',
+                  color: '#ffffff',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  fontSize: '13px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  textAlign: 'center',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  gap: '8px',
+                  boxShadow: '0 0 12px rgba(236, 72, 153, 0.15)',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(236, 72, 153, 0.18)';
+                  e.currentTarget.style.borderColor = 'var(--accent-pink)';
+                  e.currentTarget.style.boxShadow = '0 0 20px rgba(236, 72, 153, 0.35)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'rgba(236, 72, 153, 0.1)';
+                  e.currentTarget.style.borderColor = 'rgba(236, 72, 153, 0.5)';
+                  e.currentTarget.style.boxShadow = '0 0 12px rgba(236, 72, 153, 0.15)';
+                }}
+              >
+                <span>📳</span>
+                <span>휴대폰 흔들기 또는 랜덤 셔플 🎲</span>
+              </button>
+            </div>
+
+            {/* 전체 분석 리포트 카드 (데스크톱 전용) */}
+            {!isMobile && (
+              <div style={{
+                background: 'rgba(139, 92, 246, 0.03)',
+                border: '1px solid rgba(139, 92, 246, 0.18)',
+                borderRadius: '10px',
+                padding: '12px 14px',
+                display: 'flex',
+                flexDirection: 'column',
+                gap: '8px',
+                flexShrink: 0
+              }}>
+                <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent-purple)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <BarChart3 size={12} />
+                  전체 분석리포트
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '3px', fontSize: '11px', color: 'var(--text-secondary)' }}>
+                  <div>
+                    강세 카테고리: <span style={{ color: '#f8fafc', fontWeight: '600' }}>한식(571곳), 기타(114곳)</span>
+                  </div>
+                  <div>
+                    추천 대표메뉴: <span style={{ color: '#f8fafc', fontWeight: '600' }}>양꼬치, 돈까스, 매운탕</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* 스폰서 광고 슬롯 (데스크톱 전용) */}
+            {!isMobile && (
+              <div className="ad-slot-box" style={{ flexShrink: 0 }}>
+                <span style={{
+                  position: 'absolute',
+                  top: '6px',
+                  right: '8px',
+                  fontSize: '8px',
+                  fontWeight: '700',
+                  color: 'var(--accent-yellow)',
+                  letterSpacing: '0.08em',
+                  background: 'rgba(234, 179, 8, 0.08)',
+                  padding: '1px 4px',
+                  borderRadius: '3px'
+                }}>
+                  SPONSOR
+                </span>
+                <div style={{ color: '#f8fafc', fontSize: '12px', fontWeight: '700', marginBottom: '2px' }}>
+                  광고 영역 (Ad Slot)
+                </div>
+                <div style={{ color: 'var(--text-secondary)', fontSize: '10px' }}>
+                  구글 애드센스 광고가 게재될 공간입니다.
+                </div>
+              </div>
+            )}
+
+            {/* 🎮 미식 툴킷 즐길거리 (Interactive Tools) */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', flexShrink: 0 }}>
+              <button
+                onClick={() => setShowToolkitSection(!showToolkitSection)}
+                style={{
+                  width: '100%',
+                  background: 'linear-gradient(90deg, rgba(6, 182, 212, 0.08) 0%, rgba(139, 92, 246, 0.08) 100%)',
+                  border: '1px solid rgba(6, 182, 212, 0.35)',
+                  color: '#f8fafc',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  fontSize: '13px',
+                  fontWeight: '800',
+                  cursor: 'pointer',
+                  textAlign: 'left',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
+                  boxShadow: '0 0 10px rgba(6, 182, 212, 0.1)'
+                }}
+              >
+                <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  🎮 대동맛지도 미식 툴킷 <span style={{ fontSize: '10px', fontWeight: '500', color: 'var(--accent-cyan)' }}>INTERACTIVE</span>
+                </span>
+                <span>{showToolkitSection ? '▼' : '▶'}</span>
+              </button>
+
+              {showToolkitSection && (
+                <div 
+                  className="animate-fade-in"
+                  style={{
+                    background: 'rgba(15, 23, 42, 0.45)',
+                    border: '1px solid var(--border-glass)',
+                    padding: '12px',
+                    borderRadius: '10px',
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(2, 1fr)',
+                    gap: '8px'
+                  }}
+                >
+                  {([
+                    { id: 'roulette', name: '맛집 룰렛', icon: '🎯', desc: '결정장애 해소' },
+                    { id: 'mbti', name: '미식 MBTI', icon: '🧠', desc: '스와이프 성향분석' },
+                    { id: 'couple', name: '커플 궁합', icon: '👩‍❤️‍👨', desc: '데이트 식당 매칭' },
+                    { id: 'worldcup', name: '이상형 월드컵', icon: '🏆', desc: '최애 노포 8강전' },
+                    { id: 'share', name: '약속 메이커', icon: '💬', desc: '초대장 공유' },
+                    { id: 'instagram', name: '인스타 카드', icon: '📸', desc: '인증서&Wrapped' },
+                    { id: 'quiz', name: '미식 퀴즈', icon: '✏️', desc: '역사 맞추기' },
+                    { id: 'shop', name: '기프트 샵', icon: '🎁', desc: '대동 굿즈' }
+                  ] as const).map((item) => (
+                    <button
+                      key={item.id}
+                      onClick={() => onOpenToolkitTab?.(item.id)}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        background: 'rgba(30, 41, 59, 0.4)',
+                        border: '1px solid rgba(255,255,255,0.04)',
+                        borderRadius: '8px',
+                        padding: '8px 10px',
+                        cursor: 'pointer',
+                        textAlign: 'left',
+                        transition: 'all 0.2s'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.borderColor = 'var(--accent-cyan)';
+                        e.currentTarget.style.background = 'rgba(6, 182, 212, 0.05)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.04)';
+                        e.currentTarget.style.background = 'rgba(30, 41, 59, 0.4)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      <span style={{ fontSize: '20px' }}>{item.icon}</span>
+                      <div style={{ display: 'flex', flexDirection: 'column' }}>
+                        <span style={{ fontSize: '11px', fontWeight: '800', color: '#f8fafc' }}>{item.name}</span>
+                        <span style={{ fontSize: '9px', color: 'var(--text-secondary)' }}>{item.desc}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
             {/* Top 10 Featured Collection */}
             <div style={{
               background: 'rgba(236, 72, 153, 0.05)',
@@ -1081,6 +1093,7 @@ export default function Sidebar({
               </div>
             </div>
 
+            {/* 맛집 리스트 카드 목록 */}
             {filteredRestaurants.length === 0 ? (
               <div style={{ textAlign: 'center', padding: '40px 20px', color: 'var(--text-muted)', fontSize: '13px' }}>
                 🔍 조건에 일치하는 맛집이 없습니다.

@@ -356,6 +356,12 @@ export default function GourmetToolkit({
     syncRate: number;
   } | null>(null);
 
+  // Drag states for Tinder-style card swiping
+  const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+  const hasAutoActivatedRef = useRef(false);
+
   const matchParams = useMemo(() => {
     const params = new URLSearchParams(window.location.search);
     const likes = params.get('likes');
@@ -368,10 +374,21 @@ export default function GourmetToolkit({
 
   // Auto-activate MBTI swipe mode if deep linked with likes & senderName
   useEffect(() => {
-    if (isOpen && matchParams.senderLikes.length > 0 && matchParams.senderName) {
+    if (isOpen && matchParams.senderLikes.length > 0 && matchParams.senderName && !hasAutoActivatedRef.current) {
+      hasAutoActivatedRef.current = true;
       setTimeout(() => {
         setActiveTab('mbti');
         setMbtiTabMode('swipe');
+        
+        // Clear likes and senderName from URL to prevent sticky redirect on subsequent opens
+        try {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('likes');
+          url.searchParams.delete('senderName');
+          window.history.replaceState({}, document.title, url.pathname + url.search);
+        } catch (e) {
+          console.error('Failed to clear matchmaking query params:', e);
+        }
       }, 0);
     }
   }, [isOpen, matchParams]);
@@ -489,6 +506,50 @@ export default function GourmetToolkit({
         syncRate: rate
       });
     }
+  };
+
+  const handleDragStart = (clientX: number, clientY: number) => {
+    setIsDragging(true);
+    dragStartRef.current = { x: clientX, y: clientY };
+  };
+
+  const handleDragMove = (clientX: number, clientY: number) => {
+    if (!isDragging) return;
+    const deltaX = clientX - dragStartRef.current.x;
+    const deltaY = clientY - dragStartRef.current.y;
+    setDragOffset({ x: deltaX, y: deltaY });
+  };
+
+  const handleDragEnd = () => {
+    if (!isDragging) return;
+    setIsDragging(false);
+
+    const SWIPE_THRESHOLD = 80;
+    if (dragOffset.x > SWIPE_THRESHOLD) {
+      // LIKE
+      const currentCard = swipePool[swipeIndex];
+      if (currentCard) {
+        if (currentCard.id === 'sponsored_voucher_makgeolli') {
+          setShowCouponVoucher(true);
+        }
+        const newLikes = [...swipeLikes, currentCard.id || ''];
+        setSwipeLikes(newLikes);
+        if (swipeIndex < swipePool.length - 1) {
+          setSwipeIndex(swipeIndex + 1);
+        } else {
+          handleSwipeFinish(newLikes);
+        }
+      }
+    } else if (dragOffset.x < -SWIPE_THRESHOLD) {
+      // PASS
+      if (swipeIndex < swipePool.length - 1) {
+        setSwipeIndex(swipeIndex + 1);
+      } else {
+        handleSwipeFinish();
+      }
+    }
+
+    setDragOffset({ x: 0, y: 0 });
   };
 
   const generateSwipeLink = () => {
@@ -1225,20 +1286,76 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                           매칭 카드 ({swipeIndex + 1} / {swipePool.length})
                         </div>
                         
-                        <div style={{
-                          width: '100%',
-                          height: '220px',
-                          background: 'rgba(15, 23, 42, 0.85)',
-                          border: '2px solid var(--accent-orange)',
-                          borderRadius: '12px',
-                          padding: '16px',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          justifyContent: 'space-between',
-                          boxShadow: '0 0 20px rgba(249, 115, 22, 0.15)',
-                          textAlign: 'center',
-                          position: 'relative'
-                        }}>
+                        <div 
+                          onMouseDown={(e) => handleDragStart(e.clientX, e.clientY)}
+                          onMouseMove={(e) => handleDragMove(e.clientX, e.clientY)}
+                          onMouseUp={handleDragEnd}
+                          onMouseLeave={handleDragEnd}
+                          onTouchStart={(e) => handleDragStart(e.touches[0].clientX, e.touches[0].clientY)}
+                          onTouchMove={(e) => handleDragMove(e.touches[0].clientX, e.touches[0].clientY)}
+                          onTouchEnd={handleDragEnd}
+                          style={{
+                            width: '100%',
+                            height: '220px',
+                            background: 'rgba(15, 23, 42, 0.85)',
+                            border: '2px solid var(--accent-orange)',
+                            borderRadius: '12px',
+                            padding: '16px',
+                            display: 'flex',
+                            flexDirection: 'column',
+                            justifyContent: 'space-between',
+                            boxShadow: '0 0 20px rgba(249, 115, 22, 0.15)',
+                            textAlign: 'center',
+                            position: 'relative',
+                            transform: `translate(${dragOffset.x}px, ${dragOffset.y}px) rotate(${dragOffset.x * 0.08}deg)`,
+                            transition: isDragging ? 'none' : 'transform 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275)',
+                            userSelect: 'none',
+                            WebkitUserSelect: 'none',
+                            cursor: isDragging ? 'grabbing' : 'grab',
+                            touchAction: 'none'
+                          }}
+                        >
+                          {/* LIKE stamp */}
+                          {dragOffset.x > 15 && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '20px',
+                              left: '20px',
+                              border: '3px solid #10b981',
+                              color: '#10b981',
+                              fontSize: '18px',
+                              fontWeight: '900',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              transform: 'rotate(-15deg)',
+                              opacity: Math.min(Math.abs(dragOffset.x) / 60, 0.9),
+                              zIndex: 20,
+                              pointerEvents: 'none'
+                            }}>
+                              LIKE
+                            </div>
+                          )}
+
+                          {/* PASS stamp */}
+                          {dragOffset.x < -15 && (
+                            <div style={{
+                              position: 'absolute',
+                              top: '20px',
+                              right: '20px',
+                              border: '3px solid #ef4444',
+                              color: '#ef4444',
+                              fontSize: '18px',
+                              fontWeight: '900',
+                              padding: '4px 10px',
+                              borderRadius: '6px',
+                              transform: 'rotate(15deg)',
+                              opacity: Math.min(Math.abs(dragOffset.x) / 60, 0.9),
+                              zIndex: 20,
+                              pointerEvents: 'none'
+                            }}>
+                              PASS
+                            </div>
+                          )}
                           <div style={{
                             position: 'absolute',
                             top: '8px',

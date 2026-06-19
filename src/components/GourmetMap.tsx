@@ -16,7 +16,7 @@ const CATEGORY_COLORS: Record<string, string> = {
 interface GourmetMapProps {
   restaurants: RestaurantRaw[];
   selectedRestaurant: RestaurantRaw | null;
-  onSelectRestaurant: (restaurant: RestaurantRaw) => void;
+  onSelectRestaurant: (restaurant: RestaurantRaw | null) => void;
   mapRef: React.MutableRefObject<L.Map | null>; // App.tsx에서 제어하기 위해 mapRef를 넘겨 받음
   routeRestaurants?: RestaurantRaw[];
 }
@@ -36,6 +36,12 @@ export default function GourmetMap({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const markersRef = useRef<Record<string, CustomMarker>>({});
   const markerGroupRef = useRef<L.FeatureGroup | null>(null);
+
+  // Keep callback fresh without map re-initialization
+  const onSelectRestaurantRef = useRef(onSelectRestaurant);
+  useEffect(() => {
+    onSelectRestaurantRef.current = onSelectRestaurant;
+  }, [onSelectRestaurant]);
 
   // Premium map skin state & refs
   const [mapSkin, setMapSkin] = useState<'cyberpunk' | 'smooth' | 'light'>('cyberpunk');
@@ -70,6 +76,11 @@ export default function GourmetMap({
 
     mapRef.current = map;
     markerGroupRef.current = L.featureGroup().addTo(map);
+
+    // 지도 빈 공간 클릭 시 선택 해제 및 상세 패널 닫기
+    map.on('click', () => {
+      onSelectRestaurantRef.current(null);
+    });
 
     // 클린업
     return () => {
@@ -230,7 +241,8 @@ export default function GourmetMap({
       marker.activeIcon = activeIcon;
 
       // 마커 클릭 이벤트 연동
-      marker.on('click', () => {
+      marker.on('click', (e) => {
+        L.DomEvent.stopPropagation(e);
         onSelectRestaurant(res);
       });
 
