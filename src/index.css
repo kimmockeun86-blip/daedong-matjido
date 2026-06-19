@@ -103,6 +103,54 @@ body, html, #root {
   background: var(--accent-cyan);
 }
 
+/* Premium Scrollbar Skins by Theme */
+.theme-cyberpunk ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.theme-cyberpunk ::-webkit-scrollbar-track {
+  background: rgba(3, 7, 18, 0.4);
+}
+.theme-cyberpunk ::-webkit-scrollbar-thumb {
+  background: rgba(6, 182, 212, 0.25);
+  border-radius: 3px;
+  border: 1px solid rgba(6, 182, 212, 0.1);
+}
+.theme-cyberpunk ::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-cyan);
+}
+
+.theme-smooth ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.theme-smooth ::-webkit-scrollbar-track {
+  background: rgba(15, 23, 42, 0.4);
+}
+.theme-smooth ::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.3);
+  border-radius: 3px;
+  border: 1px solid rgba(139, 92, 246, 0.15);
+}
+.theme-smooth ::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-purple);
+}
+
+.theme-light ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+.theme-light ::-webkit-scrollbar-track {
+  background: rgba(241, 245, 249, 0.5);
+}
+.theme-light ::-webkit-scrollbar-thumb {
+  background: rgba(148, 163, 184, 0.5);
+  border-radius: 3px;
+}
+.theme-light ::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 116, 139, 0.7);
+}
+
 /* Leaflet Override Styles */
 .leaflet-container {
   background-color: var(--bg-primary) !important;

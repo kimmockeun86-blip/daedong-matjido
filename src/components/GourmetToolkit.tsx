@@ -346,6 +346,7 @@ export default function GourmetToolkit({
   const [swipeIndex, setSwipeIndex] = useState(0);
   const [swipeLikes, setSwipeLikes] = useState<string[]>([]);
   const [swipeCompleted, setSwipeCompleted] = useState(false);
+  const [showCouponVoucher, setShowCouponVoucher] = useState(false);
   const [swipeUserName, setSwipeUserName] = useState('');
   const [swipeResult, setSwipeResult] = useState<{ title: string; desc: string; tag: string } | null>(null);
   const [swipeLinkCopied, setSwipeLinkCopied] = useState(false);
@@ -413,8 +414,26 @@ export default function GourmetToolkit({
           pool.push(rand);
         }
       }
+      const sponsoredCard: RestaurantRaw = {
+        id: 'sponsored_voucher_makgeolli',
+        name: '🍶 [쿠폰] 주문진 생막걸리 무료 증정',
+        category: '스폰서',
+        address: '전국 대동맛지도 제휴 노포 매장',
+        rating: 5.0,
+        review: '대동맛지도 B2B 단독 제휴! 이 카드를 오른쪽(LIKE)으로 밀면, 대동맛지도 제휴 맛집/노포 방문 시 당일 테이블당 1병 무료 제공되는 주문진 생막걸리 쿠폰이 즉시 발급됩니다!',
+        menu: '주문진 생막걸리 1병 무료 쿠폰',
+        latitude: 0,
+        longitude: 0
+      };
+
       setTimeout(() => {
-        setSwipePool(pool.slice(0, 8));
+        const finalPool = [...pool.slice(0, 7)];
+        if (finalPool.length >= 3) {
+          finalPool.splice(3, 0, sponsoredCard);
+        } else {
+          finalPool.push(sponsoredCard);
+        }
+        setSwipePool(finalPool);
       }, 0);
     }
   }, [activeTab, restaurants, swipePool.length, isUnlocked, top10Ids, matchParams.senderLikes]);
@@ -1281,7 +1300,11 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                           </button>
                           <button
                             onClick={() => {
-                              const newLikes = [...swipeLikes, swipePool[swipeIndex].id || ''];
+                              const currentCard = swipePool[swipeIndex];
+                              if (currentCard.id === 'sponsored_voucher_makgeolli') {
+                                setShowCouponVoucher(true);
+                              }
+                              const newLikes = [...swipeLikes, currentCard.id || ''];
                               setSwipeLikes(newLikes);
                               if (swipeIndex < swipePool.length - 1) {
                                 setSwipeIndex(swipeIndex + 1);
@@ -1403,6 +1426,7 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                           setSwipeIndex(0);
                           setSwipeLikes([]);
                           setSwipeCompleted(false);
+                          setShowCouponVoucher(false);
                           setSwipeResult(null);
                           setMatchedResults(null);
                           setSwipePool([]);
@@ -1424,6 +1448,104 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                       </button>
                     </div>
                   )}
+              {/* 🍶 스폰서 쿠폰 발급 오버레이 모달 */}
+              {showCouponVoucher && (
+                <div style={{
+                  position: 'absolute',
+                  top: 0,
+                  left: 0,
+                  right: 0,
+                  bottom: 0,
+                  background: 'rgba(2, 6, 17, 0.95)',
+                  display: 'flex',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  zIndex: 20
+                }} className="animate-fade-in">
+                  <div style={{
+                    width: '280px',
+                    background: '#1e293b',
+                    border: '1.5px solid var(--accent-yellow)',
+                    borderRadius: '12px',
+                    padding: '20px',
+                    position: 'relative',
+                    textAlign: 'center',
+                    boxShadow: '0 0 20px rgba(234, 179, 8, 0.3)'
+                  }}>
+                    <span style={{ fontSize: '24px' }}>🎁</span>
+                    <h4 style={{ fontSize: '16px', fontWeight: '900', color: '#f8fafc', marginTop: '10px', marginBottom: '2px' }}>
+                      스폰서 쿠폰 발급 완료!
+                    </h4>
+                    <p style={{ fontSize: '10px', color: 'var(--text-secondary)', marginBottom: '16px' }}>
+                      대동맛지도 B2B 제휴 노포 방문 시 본 쿠폰을 제시해주세요.
+                    </p>
+                    
+                    {/* 쿠폰 영수증 정보 */}
+                    <div style={{
+                      textAlign: 'left',
+                      fontSize: '11px',
+                      color: '#cbd5e1',
+                      background: 'rgba(0,0,0,0.25)',
+                      padding: '12px',
+                      borderRadius: '6px',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '6px',
+                      marginBottom: '16px',
+                      fontFamily: 'monospace'
+                    }}>
+                      <div style={{ color: 'var(--accent-yellow)', fontWeight: '800' }}>[혜택] 주문진 생막걸리 1병 무료</div>
+                      <div>[가맹] 전국 대동맛지도 제휴 노포</div>
+                      <div>[기한] 2026년 12월 31일 까지</div>
+                      <div style={{ borderTop: '1px dashed rgba(255,255,255,0.1)', paddingTop: '6px', textAlign: 'center', fontSize: '9px', letterSpacing: '2px', color: '#94a3b8' }}>
+                        ||||| | |||| | ||| |||| ||
+                      </div>
+                      <div style={{ textAlign: 'center', fontSize: '9px', color: '#64748b' }}>
+                        DMAT-MAK-2026-NEON
+                      </div>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '8px' }}>
+                      <button
+                        onClick={() => {
+                          safeCopyToClipboard('DMAT-MAK-2026-NEON')
+                            .then(() => alert('쿠폰 코드가 복사되었습니다!'))
+                            .catch(() => alert('복사에 실패했습니다.'));
+                        }}
+                        style={{
+                          flex: 1,
+                          padding: '8px 0',
+                          background: 'rgba(255,255,255,0.05)',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          color: '#cbd5e1',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: '700',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        코드 복사
+                      </button>
+                      <button
+                        onClick={() => setShowCouponVoucher(false)}
+                        style={{
+                          flex: 1,
+                          padding: '8px 0',
+                          background: 'var(--accent-yellow)',
+                          color: '#020617',
+                          border: 'none',
+                          borderRadius: '6px',
+                          fontSize: '11px',
+                          fontWeight: '800',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        확인
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              )}
                 </div>
               )}
             </div>

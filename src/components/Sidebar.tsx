@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, MapPin, Compass, Navigation, BarChart3, X } from 'lucide-react';
 import type { RestaurantRaw } from '../utils/excel';
 import L from 'leaflet';
@@ -93,6 +93,27 @@ export default function Sidebar({
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
 
+  // Shake Match State & Refs
+  const [shakeResultRestaurant, setShakeResultRestaurant] = useState<RestaurantRaw | null>(null);
+  const isShufflingRef = useRef(false);
+
+  // 고유 카테고리 추출
+  const categories = ['전체', '한식', '중식', '일식', '양식', '분식', '육류'];
+
+  // 동적 지역별 분포 계산
+  const regionsSorted = useMemo(() => {
+    const regionMap: Record<string, number> = {};
+    restaurants.forEach((r) => {
+      if (r.region) {
+        regionMap[r.region] = (regionMap[r.region] || 0) + 1;
+      }
+    });
+
+    return Object.entries(regionMap)
+      .map(([name, count]) => ({ name, count }))
+      .sort((a, b) => b.count - a.count);
+  }, [restaurants]);
+
   // Bug 7: invalidateSize on collapse/expand transition or resize
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -124,6 +145,102 @@ export default function Sidebar({
       };
     }
   }, []);
+
+  // Cycle 22: Shake / Sensor Match deciding logic
+  const triggerShake = useCallback(() => {
+    if (isShufflingRef.current) return;
+    isShufflingRef.current = true;
+    
+    let count = 0;
+    const interval = setInterval(() => {
+      // Pick random filters for machine slot animation effect
+      const randCat = categories[Math.floor(Math.random() * categories.length)];
+      const randReg = regionsSorted.length > 0 
+        ? regionsSorted[Math.floor(Math.random() * regionsSorted.length)].name 
+        : '전체';
+      setSelectedCategory(randCat);
+      setSelectedRegion(randReg);
+      count++;
+      
+      if (count > 8) {
+        clearInterval(interval);
+        
+        // Final Selection: pick a random restaurant from the main list
+        if (restaurants.length > 0) {
+          const finalRest = restaurants[Math.floor(Math.random() * restaurants.length)];
+          setSelectedCategory(finalRest.category || '전체');
+          setSelectedRegion(finalRest.region || '전체');
+          
+          onSelectRestaurant(finalRest);
+          setShakeResultRestaurant(finalRest);
+          
+          if (navigator.vibrate) {
+            navigator.vibrate([100, 50, 100]);
+          }
+        }
+        isShufflingRef.current = false;
+      }
+    }, 100);
+  }, [restaurants, regionsSorted, setSelectedCategory, setSelectedRegion, onSelectRestaurant]);
+
+  // Request sensor permission and trigger
+  const handleShakeTrigger = async () => {
+    if (
+      typeof DeviceMotionEvent !== 'undefined' &&
+      typeof (DeviceMotionEvent as any).requestPermission === 'function'
+    ) {
+      try {
+        const permissionState = await (DeviceMotionEvent as any).requestPermission();
+        if (permissionState === 'granted') {
+          triggerShake();
+        } else {
+          triggerShake();
+        }
+      } catch (err) {
+        console.error('Sensor permission request failed:', err);
+        triggerShake();
+      }
+    } else {
+      triggerShake();
+    }
+  };
+
+  // Add devicemotion listener for shake detection
+  useEffect(() => {
+    let lastX = 0, lastY = 0, lastZ = 0;
+    let lastTime = 0;
+    const SHAKE_THRESHOLD = 15;
+
+    const handleMotion = (e: DeviceMotionEvent) => {
+      const acc = e.accelerationIncludingGravity;
+      if (!acc) return;
+
+      const currentTime = Date.now();
+      if ((currentTime - lastTime) > 100) {
+        const diffTime = currentTime - lastTime;
+        lastTime = currentTime;
+
+        const x = acc.x || 0;
+        const y = acc.y || 0;
+        const z = acc.z || 0;
+
+        const speed = Math.abs(x + y + z - lastX - lastY - lastZ) / diffTime * 10000;
+
+        if (speed > SHAKE_THRESHOLD * 10) {
+          triggerShake();
+        }
+
+        lastX = x;
+        lastY = y;
+        lastZ = z;
+      }
+    };
+
+    window.addEventListener('devicemotion', handleMotion);
+    return () => {
+      window.removeEventListener('devicemotion', handleMotion);
+    };
+  }, [triggerShake]);
 
   // Bug 32: Listen for custom event to trigger unlock modal from deep link block
   useEffect(() => {
@@ -221,22 +338,7 @@ export default function Sidebar({
     }
   };
 
-  // 고유 카테고리 추출
-  const categories = ['전체', '한식', '중식', '일식', '양식', '분식', '육류'];
 
-  // 동적 지역별 분포 계산
-  const regionsSorted = useMemo(() => {
-    const regionMap: Record<string, number> = {};
-    restaurants.forEach((r) => {
-      if (r.region) {
-        regionMap[r.region] = (regionMap[r.region] || 0) + 1;
-      }
-    });
-
-    return Object.entries(regionMap)
-      .map(([name, count]) => ({ name, count }))
-      .sort((a, b) => b.count - a.count);
-  }, [restaurants]);
 
   return (
     <div 
@@ -723,6 +825,45 @@ export default function Sidebar({
             </>
           ) }
 
+          {/* 흔들어서 결정 (Shake/Shuffle) 버튼 */}
+          <div style={{ display: 'flex', gap: '8px', width: '100%', flexShrink: 0 }}>
+            <button
+              onClick={handleShakeTrigger}
+              className="animate-pulse-cyan"
+              style={{
+                width: '100%',
+                background: 'linear-gradient(90deg, rgba(236, 72, 153, 0.1) 0%, rgba(6, 182, 212, 0.1) 100%)',
+                border: '1.5px dashed var(--accent-pink)',
+                color: '#ffffff',
+                borderRadius: '8px',
+                padding: '10px 14px',
+                fontSize: '13px',
+                fontWeight: '800',
+                cursor: 'pointer',
+                textAlign: 'center',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                gap: '8px',
+                boxShadow: '0 0 12px rgba(236, 72, 153, 0.15)',
+                transition: 'all 0.2s'
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(236, 72, 153, 0.18)';
+                e.currentTarget.style.borderColor = 'var(--accent-pink)';
+                e.currentTarget.style.boxShadow = '0 0 20px rgba(236, 72, 153, 0.35)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'rgba(236, 72, 153, 0.1)';
+                e.currentTarget.style.borderColor = 'rgba(236, 72, 153, 0.5)';
+                e.currentTarget.style.boxShadow = '0 0 12px rgba(236, 72, 153, 0.15)';
+              }}
+            >
+              <span>📳</span>
+              <span>휴대폰 흔들기 또는 랜덤 셔플 🎲</span>
+            </button>
+          </div>
+
           {/* 전체 분석 리포트 카드 (데스크톱 전용) */}
           {!isMobile && (
             <div style={{
@@ -949,6 +1090,7 @@ export default function Sidebar({
                 {filteredRestaurants.map((res, idx) => {
                   const isLockedItem = !unlockProgress.isUnlocked && idx >= 5;
                   const isSelected = selectedRestaurant?.id === res.id;
+                  const isSponsored = res.name === '경상도집' || res.name === '굴다리식당';
                   
                   // 음식 종류에 따라 배지 컬러 지정
                   let badgeBg = 'rgba(249, 115, 22, 0.1)';
@@ -981,7 +1123,12 @@ export default function Sidebar({
                         padding: '16px',
                         borderRadius: '12px',
                         background: isSelected ? 'rgba(6, 182, 212, 0.08)' : 'rgba(30, 41, 59, 0.35)',
-                        border: `1.5px solid ${isSelected ? 'var(--accent-cyan)' : 'rgba(255, 255, 255, 0.04)'}`,
+                        border: isSelected 
+                          ? '1.5px solid var(--accent-cyan)' 
+                          : (isSponsored ? '1.5px solid rgba(234, 179, 8, 0.45)' : '1.5px solid rgba(255, 255, 255, 0.04)'),
+                        boxShadow: isSponsored && !isSelected
+                          ? '0 0 10px rgba(234, 179, 8, 0.15)'
+                          : 'none',
                         cursor: 'pointer',
                         transition: 'all 0.25s',
                         display: 'flex',
@@ -994,14 +1141,14 @@ export default function Sidebar({
                       onMouseEnter={(e) => {
                         if (isLockedItem) return;
                         if (!isSelected) {
-                          e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)';
+                          e.currentTarget.style.borderColor = isSponsored ? 'var(--accent-yellow)' : 'rgba(255,255,255,0.08)';
                           e.currentTarget.style.background = 'rgba(30, 41, 59, 0.5)';
                         }
                       }}
                       onMouseLeave={(e) => {
                         if (isLockedItem) return;
                         if (!isSelected) {
-                          e.currentTarget.style.borderColor = 'rgba(255, 255, 255, 0.04)';
+                          e.currentTarget.style.borderColor = isSponsored ? 'rgba(234, 179, 8, 0.45)' : 'rgba(255, 255, 255, 0.04)';
                           e.currentTarget.style.background = 'rgba(30, 41, 59, 0.35)';
                         }
                       }}
@@ -1019,6 +1166,19 @@ export default function Sidebar({
                           }}>
                             {res.category}
                           </span>
+                          {isSponsored && (
+                            <span style={{
+                              fontSize: '9px',
+                              fontWeight: '800',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              background: 'rgba(234, 179, 8, 0.12)',
+                              color: 'var(--accent-yellow)',
+                              border: '1px solid rgba(234, 179, 8, 0.25)'
+                            }}>
+                              🌟 제휴 노포
+                            </span>
+                          )}
                           <span style={{ fontSize: '15px', fontWeight: '800', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                             {res.name}
                           </span>
@@ -1302,6 +1462,154 @@ export default function Sidebar({
                 onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               >
                 💬 단톡방 공유용 초대장 복사하기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 📳 흔들기 결정 매칭 오버레이 모달 */}
+      {shakeResultRestaurant && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(3, 7, 18, 0.95)',
+          backdropFilter: 'blur(16px)',
+          WebkitBackdropFilter: 'blur(16px)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 99999,
+          padding: '16px'
+        }} className="animate-fade-in">
+          <div 
+            className="glass-panel"
+            style={{
+              width: '320px',
+              padding: '24px',
+              border: '1.5px solid var(--accent-pink)',
+              boxShadow: '0 0 30px rgba(236, 72, 153, 0.3)',
+              borderRadius: '16px',
+              textAlign: 'center',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '16px',
+              position: 'relative'
+            }}
+          >
+            {/* 닫기 버튼 */}
+            <button
+              onClick={() => setShakeResultRestaurant(null)}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                background: 'rgba(255,255,255,0.05)',
+                border: 'none',
+                color: '#fff',
+                borderRadius: '50%',
+                width: '24px',
+                height: '24px',
+                cursor: 'pointer',
+                display: 'flex',
+                justifyContent: 'center',
+                alignItems: 'center',
+                fontSize: '12px'
+              }}
+            >
+              ✕
+            </button>
+
+            <div>
+              <span style={{ fontSize: '36px', display: 'block', animation: 'bounce 1s infinite' }}>🎰</span>
+              <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--accent-pink)', letterSpacing: '0.15em', marginTop: '8px' }}>
+                SHAKE MATCH DECISION
+              </div>
+              <h3 style={{ fontSize: '20px', fontWeight: '900', color: '#f8fafc', marginTop: '4px' }}>
+                흔들기 추천 완료!
+              </h3>
+            </div>
+
+            {/* 결과 카드 */}
+            <div style={{
+              background: 'rgba(30, 41, 59, 0.45)',
+              border: '1px solid rgba(255,255,255,0.05)',
+              padding: '16px',
+              borderRadius: '12px',
+              textAlign: 'left'
+            }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <span style={{
+                  fontSize: '9px',
+                  fontWeight: '800',
+                  padding: '2px 6px',
+                  borderRadius: '4px',
+                  background: 'rgba(236, 72, 153, 0.1)',
+                  color: 'var(--accent-pink)'
+                }}>
+                  {shakeResultRestaurant.category}
+                </span>
+                <span style={{ fontSize: '11px', color: 'var(--accent-yellow)', fontWeight: '700' }}>
+                  ★ {shakeResultRestaurant.rating}
+                </span>
+              </div>
+              <h4 style={{ fontSize: '16px', fontWeight: '800', color: '#f8fafc' }}>
+                {shakeResultRestaurant.name}
+              </h4>
+              <p style={{ fontSize: '11px', color: 'var(--text-secondary)', marginTop: '4px' }}>
+                📍 {shakeResultRestaurant.address}
+              </p>
+              {shakeResultRestaurant.menu && (
+                <p style={{ fontSize: '11px', color: 'var(--accent-cyan)', marginTop: '6px', fontWeight: '600' }}>
+                  🍲 대표메뉴: {shakeResultRestaurant.menu}
+                </p>
+              )}
+            </div>
+
+            {/* 버튼들 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
+              <button
+                onClick={() => {
+                  const shareText = `결정장애 종결! 대동맛지도를 흔들어서 5초 만에 결정한 오늘의 맛집: ${shakeResultRestaurant.name} (${shakeResultRestaurant.category}) - ${shakeResultRestaurant.address}\n바로 확인: ${window.location.origin}/?id=${shakeResultRestaurant.id}`;
+                  safeCopyToClipboard(shareText)
+                    .then(() => alert('결정된 맛집 정보가 클립보드에 복사되었습니다. 친구들과 카톡방에 공유해보세요!'))
+                    .catch(() => alert('복사에 실패했습니다. 직접 복사해주세요.'));
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px 0',
+                  background: 'linear-gradient(135deg, var(--accent-pink) 0%, var(--accent-cyan) 100%)',
+                  border: 'none',
+                  borderRadius: '8px',
+                  color: '#ffffff',
+                  fontSize: '12px',
+                  fontWeight: '800',
+                  cursor: 'pointer'
+                }}
+              >
+                🔗 결정 결과 카톡방에 공유하기
+              </button>
+
+              <button
+                onClick={() => {
+                  setShakeResultRestaurant(null);
+                }}
+                style={{
+                  width: '100%',
+                  padding: '8px 0',
+                  background: 'rgba(255,255,255,0.05)',
+                  border: '1px solid rgba(255,255,255,0.1)',
+                  borderRadius: '8px',
+                  color: '#cbd5e1',
+                  fontSize: '12px',
+                  fontWeight: '700',
+                  cursor: 'pointer'
+                }}
+              >
+                닫기
               </button>
             </div>
           </div>

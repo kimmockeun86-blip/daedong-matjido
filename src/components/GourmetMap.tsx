@@ -102,6 +102,9 @@ export default function GourmetMap({
       maxZoom: 20
     }).addTo(map);
 
+    // Apply body class for themed scrollbars
+    document.body.className = `theme-${mapSkin}`;
+
     // Apply filter effects to the tiles container
     const container = map.getPane('tilePane');
     if (container) {
