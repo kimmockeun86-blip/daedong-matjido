@@ -126,24 +126,12 @@ export default function Sidebar({
   }, [isCollapsed, isMobile, mapRef]);
 
   // Bug 8: disableScrollPropagation & disableClickPropagation on Sidebar
-  // Also stop touchmove/touchend propagation to prevent Leaflet map panning on mobile scroll
+  // Leaflet's disableClickPropagation stops touchstart, which is sufficient to prevent map panning on scroll.
   useEffect(() => {
     const container = containerRef.current;
     if (container) {
       L.DomEvent.disableScrollPropagation(container);
       L.DomEvent.disableClickPropagation(container);
-
-      const stopTouch = (e: TouchEvent) => {
-        e.stopPropagation();
-      };
-      
-      container.addEventListener('touchmove', stopTouch, { passive: false });
-      container.addEventListener('touchend', stopTouch, { passive: false });
-      
-      return () => {
-        container.removeEventListener('touchmove', stopTouch);
-        container.removeEventListener('touchend', stopTouch);
-      };
     }
   }, []);
 

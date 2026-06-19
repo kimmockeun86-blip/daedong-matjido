@@ -127,18 +127,6 @@ export default function GourmetToolkit({
     if (container) {
       L.DomEvent.disableScrollPropagation(container);
       L.DomEvent.disableClickPropagation(container);
-
-      const stopTouch = (e: TouchEvent) => {
-        e.stopPropagation();
-      };
-      
-      container.addEventListener('touchmove', stopTouch, { passive: false });
-      container.addEventListener('touchend', stopTouch, { passive: false });
-      
-      return () => {
-        container.removeEventListener('touchmove', stopTouch);
-        container.removeEventListener('touchend', stopTouch);
-      };
     }
   }, [isOpen]);
 
