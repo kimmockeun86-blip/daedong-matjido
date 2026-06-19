@@ -198,7 +198,9 @@ export default function Sidebar({
   useEffect(() => {
     let lastX = 0, lastY = 0, lastZ = 0;
     let lastTime = 0;
-    const SHAKE_THRESHOLD = 15;
+    let shakeCount = 0;
+    let lastShakeTime = 0;
+    const SHAKE_THRESHOLD = 80; // 민감도를 낮추기 위해 임계값 대폭 상향 (기존 15)
 
     const handleMotion = (e: DeviceMotionEvent) => {
       const acc = e.accelerationIncludingGravity;
@@ -213,10 +215,23 @@ export default function Sidebar({
         const y = acc.y || 0;
         const z = acc.z || 0;
 
-        const speed = Math.abs(x + y + z - lastX - lastY - lastZ) / diffTime * 10000;
+        // 각 축의 변화량 절댓값 합산 (동적 움직임 축적)
+        const change = Math.abs(x - lastX) + Math.abs(y - lastY) + Math.abs(z - lastZ);
+        const speed = (change / diffTime) * 10000;
 
         if (speed > SHAKE_THRESHOLD * 10) {
-          triggerShake();
+          // 마지막 흔들림이 1초보다 길면 흔들기 횟수 리셋
+          if (currentTime - lastShakeTime > 1000) {
+            shakeCount = 0;
+          }
+          shakeCount++;
+          lastShakeTime = currentTime;
+
+          // 짧은 시간(1초) 내에 강하게 4번 이상 흔들었을 때만 셔플 매칭 발동
+          if (shakeCount >= 4) {
+            triggerShake();
+            shakeCount = 0;
+          }
         }
 
         lastX = x;
