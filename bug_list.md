@@ -902,3 +902,64 @@ Cycle 22 (요청된 Cycle 11 단계) 정밀 검토 결과, **코드베이스 내
 * **해결 방안**: 
   - 일반 식당 리스트의 블러 처리 조건에서 인덱스 기반의 강제 잠금(`idx >= 5`)을 삭제하여, 해금 이전 상태더라도 일반 검색 결과 및 필터링된 식당 목록은 정상적으로 조회하고 카드 클릭이 가능하도록 로직을 수정해야 합니다.
 
+---
+
+## Cycle 37. 이미지 크롤러 오작동 및 맵 UI 이벤트 간섭 버그 리포트 (Cycle 37 Image Crawler & Map UI Bug Scan)
+
+* **검토 일시**: 2026-06-20
+* **TypeScript 컴파일 검증**: 성공 (0 Errors, 0 Warnings)
+* **ESLint 정적 분석 검증**: 성공 (0 Errors, 0 Warnings)
+
+### 발견된 신규 에지 케이스 및 개선점
+
+#### 57. 이미지 크롤러(`crawl_all_images.cjs` 및 `api/crawl-image.js`) 내 백슬래시 이스케이프 포워드 슬래시(`\/`) 변환 누락으로 인한 정규식 매칭 실패 (Uncaught JSON Escaped Slashes in Crawler Regex)
+* **상태**: 해결 완료 (Cycle 37)
+* **위치**: `scripts/crawl_all_images.cjs` (Line 54-63), `api/crawl-image.js` (Line 36-46)
+* **설명**: 
+  - 네이버 검색 결과 HTML 본문 중 이미지 URL들은 자주 JSON 데이터 형태(예: `window.__INITIAL_STATE__`)로 포함되어 있어, 포워드 슬래시가 `\/` 형태로 이스케이프(예: `https:\/\/search.pstatic.net\/common\/`)처리됩니다.
+  - 현재 이 두 파일의 문자열 정제 로직은 `&amp;`, `\u0026`, `\u002f`, `\u002F`, `\u003d`, `\u003D`, `&quot;` 등은 치환하고 있으나, 단순 이스케이프된 `\/`는 치환하지 않습니다.
+  - 또한 URL 검출 정규식(`regex = /https:\/\/search\.pstatic\.net\/common\/.../`)은 포워드 슬래시 앞에 백슬래시가 없는 일반 URL 형태만 매칭하므로, JSON 영역에 있는 대부분의 고화질 이미지 URL을 완전히 매칭하지 못하고 스킵하는 결과를 초래합니다.
+* **해결 방안**: 
+  - HTML 응답 텍스트에 정규식 매칭을 돌리기 전 `.replace(/\\\//g, '/')` 코드를 명시적으로 추가하여 모든 이스케이프된 포워드 슬래시(`\/`)를 일반 슬래시(`/`)로 통일시켜 준 뒤 정규식을 대입하도록 수정해야 합니다.
+
+#### 58. 네이버 차단/캡차 발생 시 빈 매칭을 'no_image'로 오인 기록하여 무한 재시도 유발 (Captcha/Blocking Misidentified as 'no_image' Sentinel in Image Crawler)
+* **상태**: 해결 완료 (Cycle 37)
+* **위치**: `scripts/crawl_all_images.cjs` (Line 90-93), `api/crawl-image.js` (Line 75-79)
+* **설명**: 
+  - 잦은 서버 환경 크롤링이나 순차 호출 시, 네이버가 봇 감지 캡차(Captcha) 페이지 혹은 302/403/200 리턴 제한 페이지를 내어줄 수 있습니다. 이 경우 HTML 문서 내에 실제 검색 결과와 이미지 URL이 존재하지 않아 매칭된 배열(`matches`)이 빈 배열(`[]`)이 됩니다.
+  - 현재 코드는 매칭이 비어 있을 때 이를 오류로 인지하지 않고 단순히 `img: 'no_image'`를 성공 상태(`success: true`)로 리턴하여, `restaurants.json` 파일에 `"image": "no_image"`를 강제 영구 저장합니다.
+  - 하지만 `'no_image'` 문자열은 `'http'`로 시작하지 않기 때문에, 차후 크롤러 스크립트 실행 시 `r.image.startsWith('http')` 조건을 통과하지 못해 이 식당들은 매 실행마다 네이버 검색 요청을 지속적으로 다시 보내게 되고, 이는 봇 차단 속도를 가속하는 무의미한 부작용을 유발합니다.
+* **해결 방안**: 
+  - 크롤러 결과에서 HTML 텍스트가 네이버의 검색 성공 페이지인지 검증(예: `html.includes('네이버 통합검색')`)하고, 아닐 경우 `success: false` 및 에러를 명시적으로 던져 캡차/차단 상황에서 임의로 `no_image` 판정을 쓰지 않도록 방어해야 합니다.
+
+#### 59. 지도 스킨 스위처(Map Skin Switcher) 내 이벤트 전파 버블링 미차단으로 인한 활성 맛집 선택 해제 현상 (Event Propagation Bug in Map Skin Switcher)
+* **상태**: 해결 완료 (Cycle 37)
+* **위치**: `src/components/GourmetMap.tsx` (Line 346-392)
+* **설명**: 
+  - 지도의 우측 상단에 위치한 지도 테마 전환기(Map Skin Switcher) 컨테이너는 절대 좌표 레이어로 맵 위에 떠 있습니다.
+  - 사용자가 해당 테마 버튼(예: "Joseon Vintage Scroll")을 클릭할 때, 포인터 클릭 이벤트가 하위의 Leaflet 맵 객체로도 그대로 버블링(전파)됩니다.
+  - Leaflet 지도 객체에는 지도 빈 영역 클릭 시 상세 정보를 닫고 선택 맛집을 해제하는 `map.on('click', ...)` 핸들러가 연결되어 있으므로, 스킨 테마를 바꾸기만 해도 현재 선택해 둔 식당 정보 오버레이가 예기치 않게 닫혀버려 유저 흐름이 강제로 중단됩니다.
+* **해결 방안**: 
+  - React 렌더 트리 상의 Map Skin Switcher 외부 `div` 엘리먼트에 `onClick={(e) => e.stopPropagation()}` 및 `onMouseDown={(e) => e.stopPropagation()}` 속성을 주입하여 상위 지도로 이벤트가 전파되지 않도록 완벽히 격리해야 합니다.
+
+#### 60. `restaurants.json` 내 일부 식당의 이미지 수집 실패 누락 상태 (Local public/restaurants.json Image Coverage Deficit)
+* **상태**: 해결 완료 (Cycle 37)
+* **위치**: `public/restaurants.json`
+* **설명**: 
+  - 이미지 일괄 정밀 스캔 결과, 총 824개의 대한민국 맛집 노포 데이터셋 중 **11개**의 식당이 여전히 `"image": "no_image"` 상태로 수집에 누락되어 있습니다.
+  - 누락 목록:
+    1. 으뜸한우 (강원도 태백)
+    2. 장충당 (경기도 시흥시)
+    3. 안채 (경상남도 김해시)
+    4. 소문난 팥빙수,단팥죽 (경상남도 양산시)
+    5. 생 연어 전문점 미카사로 (대전광역시 서구 괴정동)
+    6. 명보성 (서울특별시 종로구)
+    7. 화통삼 (서울특별시 은평구)
+    8. 더 함흥냉면1937 (인천광역시 인천 연수구)
+    9. 본향 (전라북도 익산)
+    10. 어멍구이 (제주도 서귀포시)
+    11. 갈비백반 (충청남도 세종시)
+* **해결 방안**: 
+  - 상기 이스케이프 슬래시 및 캡차 감지 개선 크롤링 로직이 보완된 스크립트로 해당 11곳에 대해 이미지 자동 재수집을 트리거하거나, 포털 검색명이 매칭되기 힘든 상호명인 경우 `portalSearchName`을 수동 보강하여 재동작시켜 100%에 달하는 이미지 정합성을 제공해야 합니다.
+
+

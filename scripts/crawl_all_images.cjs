@@ -51,7 +51,18 @@ async function crawlImageForRestaurant(r) {
       }
       
       let html = await res.text();
+      
+      // Captcha or rate-limiting response verification
+      if (!html.includes('네이버 검색') && !html.includes('query=')) {
+        console.warn(`[Blocked/Captcha] Naver returned anomalous page for "${query}". Pausing worker for 15 seconds... (Retries left: ${retries - 1})`);
+        await new Promise(resolve => setTimeout(resolve, 15000));
+        retries--;
+        continue;
+      }
+      
+      // Clean HTML and unescape JSON backslash-slashes
       html = html
+        .split('\\/').join('/')
         .replace(/&amp;/g, '&')
         .replace(/\\u0026/g, '&')
         .replace(/\\u002f/g, '/')
@@ -112,7 +123,7 @@ async function run() {
   let noImageCount = 0;
   let failCount = 0;
   let activeIndex = 0;
-  const CONCURRENCY = 2; // Keep it low to prevent rate limits
+  const CONCURRENCY = 2;
   
   const worker = async () => {
     while (true) {
@@ -147,7 +158,6 @@ async function run() {
         fs.writeFileSync(RESTAURANTS_FILE, JSON.stringify(restaurants, null, 2), 'utf8');
       }
       
-      // Sleep random time (500ms to 1500ms) to bypass bot protection
       const sleepTime = 500 + Math.random() * 1000;
       await new Promise(resolve => setTimeout(resolve, sleepTime));
     }

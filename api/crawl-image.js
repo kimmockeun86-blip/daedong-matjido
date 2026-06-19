@@ -32,8 +32,16 @@ export default async function handler(req, res) {
     }
 
     let html = await fetchResponse.text();
-    // HTML 및 JSON 이스케이프 문자 디코딩하여 깨끗한 URL 획득
+
+    // Captcha 또는 차단 페이지인지 확인
+    if (!html.includes('네이버 검색') && !html.includes('query=')) {
+      res.status(500).json({ error: 'Naver search rate-limited or captcha detected' });
+      return;
+    }
+
+    // HTML 및 JSON 이스케이프 문자 디코딩하여 깨끗한 URL 획득 (백슬래시 이스케이프 슬래시 제거 포함)
     html = html
+      .split('\\/').join('/')
       .replace(/&amp;/g, '&')
       .replace(/\\u0026/g, '&')
       .replace(/\\u002f/g, '/')

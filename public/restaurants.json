@@ -766,8 +766,8 @@
     "region": "강원도",
     "city": "태백",
     "menu": "소고기",
-    "portalSearchName": "으뜸한우",
-    "image": "no_image"
+    "portalSearchName": "태백 으뜸한우",
+    "image": "https://search.pstatic.net/common/?autoRotate=true&quality=95&type=f&size=464x464&src=https%3A%2F%2Fldb-phinf.pstatic.net%2F20201217_291%2F1608207167803Ph7k0_JPEG%2FrWx49x4E0BQW_5H24gZTcZTE.jpg"
   },
   {
     "name": "태백닭갈비",
@@ -3902,8 +3902,8 @@
     "region": "경상남도",
     "city": "김해시",
     "menu": "추어탕",
-    "portalSearchName": "안채",
-    "image": "no_image"
+    "portalSearchName": "김해 안채",
+    "image": "https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNjA0MDdfMjk2%2FMDAxNzc1NTQ3OTc0MDM3.TZQ28TK8HqJEq_bH0clMf3GRFrKkFBum4HFuACr9E6gg.h1MDQt4pnBfjViUnkWeRceedrhOTZMStRn5X_OML_5gg.JPEG%2F%25B1%25E8%25C7%25D8%25C3%25DF%25BE%25EE%25C5%25C1%25B8%25C0%25C1%25FD_%252813%2529.jpg%234032x3024&type=ff192_192"
   },
   {
     "name": "밀양돼지국밥",
@@ -4084,8 +4084,8 @@
     "region": "경상남도",
     "city": "양산시",
     "menu": "팥빙수",
-    "portalSearchName": "소문난 팥빙수,단팥죽",
-    "image": "no_image"
+    "portalSearchName": "양산 소문난 팥빙수",
+    "image": "https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNjA2MTlfMTc4%2FMDAxNzgxNzk3MTAwOTY1.g_kaRGBpeuox7ZeMvC8nGavkQERwdQITjpBCaRWAssIg.-Q1mBMDrJGgCziKzQeAw5QU12oge0oP7ny6yzB7DV6og.JPEG%2F02-1c05a5b1bc.jpg%231024x1280&type=ff192_192"
   },
   {
     "name": "삼정메밀소바",
@@ -5904,8 +5904,8 @@
     "region": "대전광역시",
     "city": "서구 괴정동",
     "menu": "미카사로 세트 (연어사시미+간장새우+메로구이+삼치구이+튀김)=36,000원",
-    "portalSearchName": "http://2seul-guide.com/221207149410",
-    "image": "no_image"
+    "portalSearchName": "대전 괴정동 미카사로",
+    "image": "https://search.pstatic.net/common/?autoRotate=true&type=w560_sharpen&src=https%3A%2F%2Fldb-phinf.pstatic.net%2F20240116_13%2F1705409961295EmRzF_JPEG%2F1000000735.jpg"
   },
   {
     "name": "산에산유황오리",
@@ -6884,7 +6884,7 @@
     "region": "서울특별시",
     "city": "종로구",
     "menu": "중국요리",
-    "portalSearchName": "성균대 명보성",
+    "portalSearchName": "성균관대 명보성",
     "image": "no_image"
   },
   {
@@ -7682,8 +7682,8 @@
     "region": "서울특별시",
     "city": "은평구",
     "menu": "삼겹살",
-    "portalSearchName": "화통삼",
-    "image": "no_image"
+    "portalSearchName": "은평구 화통삼",
+    "image": "https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2F20140728_191%2Fjangmi81_14064815060348voOe_JPEG%2FP20140725_231222676_8B8AE8C0-045C-478F-BFDA-A5C1ACC8B522.JPG%23550x411&type=ff192_192"
   },
   {
     "name": "멸치국수",
@@ -8340,8 +8340,8 @@
     "region": "인천광역시",
     "city": "인천 연수구",
     "menu": "냉면",
-    "portalSearchName": "더 함흥냉면",
-    "image": "no_image"
+    "portalSearchName": "인천 더 함흥냉면1937",
+    "image": "https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNTA3MjdfNTUg%2FMDAxNzUzNjA3NzI3NDg0.dwWpsd7GLwLby9QlNt90uuozUg-K3NoXxCc1uXau_N0g.I63I_3KvDCWcc3PlhdQU4VcFERL80zG7xqpkvL2c3Lkg.JPEG%2FTC%25A3%25DF00484.JPG%23720x720&type=ff192_192"
   },
   {
     "name": "박승광최강해물칼국수",
@@ -9166,8 +9166,8 @@
     "region": "전라북도",
     "city": "익산",
     "menu": "한정식(마)",
-    "portalSearchName": "본향",
-    "image": "no_image"
+    "portalSearchName": "익산 본향",
+    "image": "https://search.pstatic.net/common/?autoRotate=true&type=w560_sharpen&src=https%3A%2F%2Fldb-phinf.pstatic.net%2F20230211_31%2F1676094219593BmRUF_JPEG%2F20230129_120759.jpg"
   },
   {
     "name": "보신명가",
@@ -9810,8 +9810,8 @@
     "region": "제주도",
     "city": "서귀포시",
     "menu": "어멍정식",
-    "portalSearchName": "어멍구이",
-    "image": "no_image"
+    "portalSearchName": "서귀포 어멍구이",
+    "image": "https://search.pstatic.net/common/?src=http%3A%2F%2Fblogfiles.naver.net%2FMjAyNjA2MDZfMjcy%2FMDAxNzgwNzMzMzEyNDM2.ZN7YFsGjiKs87hya8fWkf547BEFoLya7-nE7l7Z-vogg.hpkwb1xy3qjHtP3Xp2C0ulQun7Mx0HO7qO4YgCUR1ywg.JPEG%2F900_20260602_125911.jpg%23900x675&type=ff192_192"
   },
   {
     "name": "태공식당",
@@ -10538,8 +10538,8 @@
     "region": "충청남도",
     "city": "세종시",
     "menu": "김치전골",
-    "portalSearchName": "갈비백반",
-    "image": "no_image"
+    "portalSearchName": "세종시 갈비백반",
+    "image": "https://search.pstatic.net/common/?autoRotate=true&type=w278_sharpen&src=https%3A%2F%2Fldb-phinf.pstatic.net%2F20230822_36%2F1692693495035feaUG_JPEG%2FScreenshot_2023-08-22_at_17.34.06.JPG"
   },
   {
     "name": "곤드레말 추어탕",

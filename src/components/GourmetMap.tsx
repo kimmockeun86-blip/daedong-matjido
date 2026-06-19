@@ -343,11 +343,14 @@ export default function GourmetMap({
         style={{ width: '100%', height: '100%' }} 
       />
       {/* Map Skin Switcher */}
-      <div style={{
-        position: 'absolute',
-        top: '24px',
-        right: '24px',
-        zIndex: 999,
+      <div 
+        onClick={(e) => e.stopPropagation()}
+        onMouseDown={(e) => e.stopPropagation()}
+        style={{
+          position: 'absolute',
+          top: '24px',
+          right: '24px',
+          zIndex: 999,
         background: 'rgba(15, 23, 42, 0.85)',
         backdropFilter: 'blur(12px)',
         WebkitBackdropFilter: 'blur(12px)',
