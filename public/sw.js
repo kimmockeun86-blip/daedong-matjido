@@ -14,7 +14,7 @@ self.addEventListener('fetch', (event) => {
   // Can be expanded to cache tiles and offline data later.
   event.respondWith(
     fetch(event.request).catch(() => {
-      // Fallback
+      return new Response('Offline', { status: 503, statusText: 'Service Unavailable' });
     })
   );
 });

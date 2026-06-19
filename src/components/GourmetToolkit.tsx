@@ -138,15 +138,14 @@ export default function GourmetToolkit({
   }, [restaurants]);
 
   const [activeTab, setActiveTab] = useState<'roulette' | 'mbti' | 'couple' | 'worldcup' | 'share' | 'instagram' | 'shop' | 'course' | 'quiz'>('roulette');
+  const [prevIsOpen, setPrevIsOpen] = useState(isOpen);
 
-  useEffect(() => {
+  if (isOpen !== prevIsOpen) {
+    setPrevIsOpen(isOpen);
     if (isOpen && defaultTab) {
-      const timer = setTimeout(() => {
-        setActiveTab(defaultTab);
-      }, 0);
-      return () => clearTimeout(timer);
+      setActiveTab(defaultTab);
     }
-  }, [isOpen, defaultTab]);
+  }
 
   // 1. 룰렛 관련 상태
   const [rouletteList, setRouletteList] = useState<RestaurantRaw[]>([]);
@@ -555,33 +554,33 @@ export default function GourmetToolkit({
   if (!isOpen) return null;
 
   // 1.1 룰렛 후보 식당 5곳 셔플
-  const prepareRoulette = () => {
-    if (restaurants.length === 0) return;
+  const prepareRoulette = (): RestaurantRaw[] => {
+    if (restaurants.length === 0) return [];
     const pool = !isUnlocked
       ? restaurants.filter(r => !top10Ids.includes(r.id || ''))
       : restaurants;
-    if (pool.length === 0) return;
-    const shuffled = [...pool].sort(() => 0.5 - Math.random());
-    setRouletteList(shuffled.slice(0, 5));
+    if (pool.length === 0) return [];
+    const shuffled = [...pool].sort(() => 0.5 - Math.random()).slice(0, 5);
+    setRouletteList(shuffled);
     setRouletteWinner(null);
+    return shuffled;
   };
 
   // 1.2 룰렛 회전 애니메이션
   const startSpin = () => {
-    if (rouletteList.length === 0) {
-      prepareRoulette();
+    let currentList = rouletteList;
+    if (currentList.length === 0) {
+      currentList = prepareRoulette();
     }
     setIsSpinning(true);
     setRouletteWinner(null);
 
     // 2.5초 동안 네온 회전 모사 후 당첨자 선택
     setTimeout(() => {
-      const pool = !isUnlocked
-        ? restaurants.filter(r => !top10Ids.includes(r.id || ''))
-        : restaurants;
-      const currentList = rouletteList.length > 0 ? rouletteList : [...pool].sort(() => 0.5 - Math.random()).slice(0, 5);
-      if (rouletteList.length === 0) setRouletteList(currentList);
-      
+      if (currentList.length === 0) {
+        setIsSpinning(false);
+        return;
+      }
       const winner = currentList[Math.floor(Math.random() * currentList.length)];
       setRouletteWinner(winner);
       setIsSpinning(false);
