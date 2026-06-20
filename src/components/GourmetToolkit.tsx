@@ -272,7 +272,7 @@ export default function GourmetToolkit({
     ctx.textAlign = 'center';
     ctx.fillText('大東味地圖 : WRAPPED', 250, 80);
 
-    ctx.font = 'black 42px "Noto Sans KR", sans-serif';
+    ctx.font = '900 42px "Noto Sans KR", sans-serif';
     ctx.fillStyle = '#ffffff';
     ctx.fillText('미식 역사 연대기', 250, 135);
 
@@ -299,7 +299,7 @@ export default function GourmetToolkit({
     ctx.fillStyle = '#ec4899';
     ctx.fillText('내가 소비한 노포의 역사 합계', 250, 275);
 
-    ctx.font = 'black 52px "Noto Sans KR", sans-serif';
+    ctx.font = '900 52px "Noto Sans KR", sans-serif';
     ctx.fillStyle = '#eab308'; // Gold
     ctx.fillText(`총 ${totalHeritageAge}년`, 250, 345);
 
@@ -815,7 +815,7 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
     ctx.textAlign = 'center';
     ctx.fillText('大東味地圖', 250, 80);
 
-    ctx.font = 'black 42px "Noto Sans KR", sans-serif';
+    ctx.font = '900 42px "Noto Sans KR", sans-serif';
     ctx.fillStyle = '#ffffff';
     ctx.fillText('대동맛지도', 250, 135);
 
@@ -853,7 +853,7 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
     ctx.fillText(`총 등록 매장: ${totalCount}곳`, 250, 315);
     ctx.fillText(`방문 완료: ${visitedCount}곳`, 250, 345);
 
-    ctx.font = 'black 34px "Noto Sans KR", sans-serif';
+    ctx.font = '900 34px "Noto Sans KR", sans-serif';
     ctx.fillStyle = '#eab308'; // Yellow
     ctx.fillText(`정복도: ${percentage}%`, 250, 410);
 
