@@ -404,7 +404,7 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
         position: 'relative',
         width: '100%',
         height: isMobile ? '160px' : '240px',
-        backgroundImage: `url(${headerImage})`,
+        backgroundImage: `url("${headerImage}")`,
         backgroundSize: 'cover',
         backgroundPosition: 'center',
         flexShrink: 0

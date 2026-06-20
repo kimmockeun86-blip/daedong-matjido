@@ -250,9 +250,16 @@ export default function App() {
           const merged = parsed.map(r => {
             const key = `${r.name}_${r.address || ''}`.trim();
             const defaultImg = defaultImageMap.get(key);
-            if (defaultImg && !r.image) {
-              r.image = defaultImg;
-              hasMergedNewImages = true;
+            if (defaultImg) {
+              const isCachedValid = r.image && r.image.startsWith('http');
+              const isDefaultValid = defaultImg.startsWith('http');
+              if (isDefaultValid && !isCachedValid) {
+                r.image = defaultImg;
+                hasMergedNewImages = true;
+              } else if (!r.image) {
+                r.image = defaultImg;
+                hasMergedNewImages = true;
+              }
             }
             return r;
           });
