@@ -2446,7 +2446,7 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                 >
                   <option value="">-- 추가할 노포 맛집 선택 --</option>
                   {restaurants
-                    .filter(r => isUnlocked || !top10Ids.includes(r.id || ''))
+                    .filter(r => (isUnlocked || !top10Ids.includes(r.id || '')) && r.latitude !== undefined && r.longitude !== undefined)
                     .map(r => (
                       <option key={r.id} value={r.id}>
                         [{r.category}] {r.name} - {r.address}
@@ -2620,9 +2620,14 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      const first = routeRestaurants[0];
-                      const last = routeRestaurants[routeRestaurants.length - 1];
-                      const intermediates = routeRestaurants.slice(1, routeRestaurants.length - 1);
+                      const validCoordsRoute = routeRestaurants.filter(r => r.latitude !== undefined && r.longitude !== undefined);
+                      if (validCoordsRoute.length < 2) {
+                        alert('위경도 좌표 정보가 있는 식당이 최소 2개 이상 필요합니다.');
+                        return;
+                      }
+                      const first = validCoordsRoute[0];
+                      const last = validCoordsRoute[validCoordsRoute.length - 1];
+                      const intermediates = validCoordsRoute.slice(1, validCoordsRoute.length - 1);
                       let webUrl = `https://map.kakao.com/?sY=${first.latitude}&sX=${first.longitude}&sName=${encodeURIComponent(first.name)}`;
                       intermediates.forEach((way, idx) => {
                         webUrl += `&wY${idx + 1}=${way.latitude}&wX${idx + 1}=${way.longitude}&wName${idx + 1}=${encodeURIComponent(way.name)}`;
@@ -2665,10 +2670,15 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                     href="#"
                     onClick={(e) => {
                       e.preventDefault();
-                      const first = routeRestaurants[0];
-                      const last = routeRestaurants[routeRestaurants.length - 1];
-                      const intermediates = routeRestaurants.slice(1, routeRestaurants.length - 1);
-                      const stops = routeRestaurants.map(r => `${r.latitude},${r.longitude},${encodeURIComponent(r.name)}`);
+                      const validCoordsRoute = routeRestaurants.filter(r => r.latitude !== undefined && r.longitude !== undefined);
+                      if (validCoordsRoute.length < 2) {
+                        alert('위경도 좌표 정보가 있는 식당이 최소 2개 이상 필요합니다.');
+                        return;
+                      }
+                      const first = validCoordsRoute[0];
+                      const last = validCoordsRoute[validCoordsRoute.length - 1];
+                      const intermediates = validCoordsRoute.slice(1, validCoordsRoute.length - 1);
+                      const stops = validCoordsRoute.map(r => `${r.latitude},${r.longitude},${encodeURIComponent(r.name)}`);
                       const webUrl = `https://map.naver.com/v5/directions/${stops.join('/')}/-/car`;
 
                       if (isMobile) {

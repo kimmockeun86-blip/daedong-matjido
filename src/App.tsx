@@ -146,6 +146,7 @@ export default function App() {
   const [restaurants, setRestaurants] = useState<RestaurantRaw[]>([]);
   const geocodingTaskIdRef = useRef(0);
   const [selectedRestaurant, setSelectedRestaurant] = useState<RestaurantRaw | null>(null);
+  const welcomeModalRef = useRef<HTMLDivElement | null>(null);
 
   const [unlockProgress, setUnlockProgress] = useState(() => {
     let shares = 0;
@@ -262,6 +263,13 @@ export default function App() {
     }
   });
   const [onboardingTaste, setOnboardingTaste] = useState('전체');
+
+  useEffect(() => {
+    if (showWelcomeModal && welcomeModalRef.current) {
+      L.DomEvent.disableScrollPropagation(welcomeModalRef.current);
+      L.DomEvent.disableClickPropagation(welcomeModalRef.current);
+    }
+  }, [showWelcomeModal]);
 
   const handleOpenToolkitTab = useCallback((tab: typeof toolkitTab) => {
     setToolkitTab(tab);
@@ -578,7 +586,7 @@ export default function App() {
 
               // 위경도상 적정 오차 범위 이내인 경우 가장 가까운 맛집 자동 선택 포커싱
               if (nearestRes && minDist < 0.5) {
-                setSelectedRestaurant(nearestRes);
+                handleSelectRestaurant(nearestRes);
               }
             }
           }
@@ -703,7 +711,10 @@ export default function App() {
       ids.forEach(id => {
         const matched = restaurants.find(r => r.id === id.trim() || r.name === id.trim());
         if (matched) {
-          matchedRoute.push(matched);
+          const isLocked = top10Ids.includes(matched.id || '') && !unlockProgress.isUnlocked;
+          if (!isLocked) {
+            matchedRoute.push(matched);
+          }
         }
       });
       if (matchedRoute.length > 0) {
@@ -936,7 +947,7 @@ export default function App() {
 
           {/* 웰컴 및 PWA 홈화면 앱 설치 가이드 온보딩 모달 */}
           {showWelcomeModal && (
-            <div style={{
+            <div ref={welcomeModalRef} style={{
               position: 'fixed',
               top: 0,
               left: 0,

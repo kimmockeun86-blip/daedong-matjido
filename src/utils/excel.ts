@@ -150,8 +150,14 @@ export function parseExcelFile(file: File): Promise<RestaurantRaw[]> {
           const region = row['지역'] || row['region'] || (addressStr ? addressStr.split(' ')[0] : '');
           const city = row['도시명'] || row['city'] || (addressStr ? addressStr.split(' ')[1] : '');
 
-          let rating = parseFloat(String(row['평점'] || row['rating'] || '4.5')); // 전국맛집본은 별점이 없으므로 기본 4.5 부여
-          if (isNaN(rating)) rating = 4.5;
+          const rawRating = row['평점'] !== undefined && row['평점'] !== null ? row['평점'] : row['rating'];
+          let rating = 4.5;
+          if (rawRating !== undefined && rawRating !== null && String(rawRating).trim() !== '') {
+            const parsed = parseFloat(String(rawRating));
+            if (!isNaN(parsed)) {
+              rating = parsed;
+            }
+          }
 
           const review = row['추천사유'] || row['리뷰'] || row['review'] || '';
           const menu = row['대표메뉴'] || row['menu'] || '';

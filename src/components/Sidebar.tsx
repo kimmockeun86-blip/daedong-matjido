@@ -103,6 +103,9 @@ export default function Sidebar({
 
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
+  const reportModalRef = useRef<HTMLDivElement | null>(null);
+  const unlockModalRef = useRef<HTMLDivElement | null>(null);
+  const shakeModalRef = useRef<HTMLDivElement | null>(null);
 
   // Shake Match State & Refs
   const [shakeResultRestaurant, setShakeResultRestaurant] = useState<RestaurantRaw | null>(null);
@@ -144,6 +147,20 @@ export default function Sidebar({
     }
   }, []);
 
+  useEffect(() => {
+    if (showUnlockModal && unlockModalRef.current) {
+      L.DomEvent.disableScrollPropagation(unlockModalRef.current);
+      L.DomEvent.disableClickPropagation(unlockModalRef.current);
+    }
+  }, [showUnlockModal]);
+
+  useEffect(() => {
+    if (shakeResultRestaurant && shakeModalRef.current) {
+      L.DomEvent.disableScrollPropagation(shakeModalRef.current);
+      L.DomEvent.disableClickPropagation(shakeModalRef.current);
+    }
+  }, [shakeResultRestaurant]);
+
   // Cycle 22: Shake / Sensor Match deciding logic
   const triggerShake = useCallback(() => {
     if (isShufflingRef.current) return;
@@ -163,23 +180,28 @@ export default function Sidebar({
       if (count > 8) {
         clearInterval(interval);
         
-        // Final Selection: pick a random restaurant from the main list
+        // Final Selection: pick a random restaurant from the main list (excluding locked Top 10)
         if (restaurants.length > 0) {
-          const finalRest = restaurants[Math.floor(Math.random() * restaurants.length)];
-          setSelectedCategory(finalRest.category || '전체');
-          setSelectedRegion(finalRest.region || '전체');
-          
-          onSelectRestaurant(finalRest);
-          setShakeResultRestaurant(finalRest);
-          
-          if (navigator.vibrate) {
-            navigator.vibrate([100, 50, 100]);
+          const candidates = restaurants.filter(
+            r => !(top10Ids.includes(r.id || '') && !unlockProgress.isUnlocked)
+          );
+          if (candidates.length > 0) {
+            const finalRest = candidates[Math.floor(Math.random() * candidates.length)];
+            setSelectedCategory(finalRest.category || '전체');
+            setSelectedRegion(finalRest.region || '전체');
+            
+            onSelectRestaurant(finalRest);
+            setShakeResultRestaurant(finalRest);
+            
+            if (navigator.vibrate) {
+              navigator.vibrate([100, 50, 100]);
+            }
           }
         }
         isShufflingRef.current = false;
       }
     }, 100);
-  }, [restaurants, regionsSorted, setSelectedCategory, setSelectedRegion, onSelectRestaurant]);
+  }, [restaurants, regionsSorted, setSelectedCategory, setSelectedRegion, onSelectRestaurant, top10Ids, unlockProgress.isUnlocked]);
 
   // Request sensor permission and trigger
   const handleShakeTrigger = async () => {
@@ -273,6 +295,13 @@ export default function Sidebar({
   const [reportMenu, setReportMenu] = useState('');
   const [reportReason, setReportReason] = useState('');
   const [reportSuccess, setReportSuccess] = useState(false);
+
+  useEffect(() => {
+    if (showReportModal && reportModalRef.current) {
+      L.DomEvent.disableScrollPropagation(reportModalRef.current);
+      L.DomEvent.disableClickPropagation(reportModalRef.current);
+    }
+  }, [showReportModal]);
 
   // 2. 지하철역 중간지점 탐색 상태
   const [showStationSearch, setShowStationSearch] = useState(false);
@@ -1318,7 +1347,7 @@ export default function Sidebar({
 
       {/* 맛집 제보 모달 팝업 */}
       {showReportModal && (
-        <div style={{
+        <div ref={reportModalRef} style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -1424,7 +1453,7 @@ export default function Sidebar({
 
       {/* 시크릿 컬렉션 해금 모달 */}
       {showUnlockModal && (
-        <div style={{
+        <div ref={unlockModalRef} style={{
           position: 'fixed',
           top: 0,
           left: 0,
@@ -1531,7 +1560,7 @@ export default function Sidebar({
 
       {/* 📳 흔들기 결정 매칭 오버레이 모달 */}
       {shakeResultRestaurant && (
-        <div style={{
+        <div ref={shakeModalRef} style={{
           position: 'fixed',
           top: 0,
           left: 0,

@@ -51,18 +51,22 @@ export default async function handler(req, res) {
       .replace(/&quot;/g, '"');
 
     // 쉼표, 따옴표, 중괄호 등으로 흘러넘치지 않도록 제한된 URL 정규식 사용
-    const regex = /https:\/\/search\.pstatic\.net\/common\/[a-zA-Z0-9_\-\.\/\?=&%\+#:]+/g;
+    const regex = /https?:\/\/[a-zA-Z0-9_\-\.]*pstatic\.net\/[a-zA-Z0-9_\-\.\/\?=&%\+#:]+/g;
     const matches = html.match(regex) || [];
 
     // 제외할 이미지 패턴 필터링 및 점수 매칭 (크롤러 스크립트와 동일한 정밀 로직 적용)
     const ratedImages = matches
       .filter(img => {
         const lower = img.toLowerCase();
-        // 프로필 및 소형 아이콘 제외
-        if (lower.includes('profileimage') || lower.includes('blogpfthumb') || lower.includes('type=f48_48')) {
+        // 프로필 및 소형 아이콘 및 정적 자산 제외
+        if (lower.includes('profileimage') || lower.includes('blogpfthumb') || 
+            lower.includes('type=f48_48') || lower.includes('type=f30_30') || 
+            lower.includes('type=f54_54') || lower.includes('type=f96_96') ||
+            lower.includes('ssl.pstatic.net') || lower.includes('ntm.pstatic.net') || 
+            lower.includes('static-like.pstatic.net')) {
           return false;
         }
-        return lower.includes('jpeg') || lower.includes('jpg') || lower.includes('png') || lower.includes('type=');
+        return lower.includes('jpeg') || lower.includes('jpg') || lower.includes('png') || lower.includes('type=') || lower.includes('ldb-phinf');
       })
       .map(img => {
         let score = 0;
@@ -71,8 +75,12 @@ export default async function handler(req, res) {
           score = 10; // 플레이스 공식 등록 이미지
         } else if (lower.includes('blogfiles')) {
           score = 5;  // 블로그 후기 리뷰 이미지
+        } else if (lower.includes('csearch-phinf')) {
+          score = 3;  // csearch phinf 이미지
         } else if (lower.includes('clip-service')) {
           score = 2;  // 동영상 클립 프리뷰
+        } else {
+          score = 1;
         }
         return { img, score };
       });
@@ -81,7 +89,15 @@ export default async function handler(req, res) {
     ratedImages.sort((a, b) => b.score - a.score);
 
     if (ratedImages.length > 0) {
-      res.status(200).json({ image: ratedImages[0].img });
+      let bestImg = ratedImages[0].img;
+      if (bestImg.includes('search.pstatic.net')) {
+        if (bestImg.includes('type=')) {
+          bestImg = bestImg.replace(/type=[^&]+/g, 'type=w560_sharpen');
+        } else {
+          bestImg = bestImg.includes('?') ? `${bestImg}&type=w560_sharpen` : `${bestImg}?type=w560_sharpen`;
+        }
+      }
+      res.status(200).json({ image: bestImg });
     } else {
       res.status(200).json({ image: null });
     }

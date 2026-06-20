@@ -71,16 +71,21 @@ async function crawlImageForRestaurant(r) {
         .replace(/\\u003D/g, '=')
         .replace(/&quot;/g, '"');
         
-      const regex = /https:\/\/search\.pstatic\.net\/common\/[a-zA-Z0-9_\-\.\/\?=&%\+#:]+/g;
+      const regex = /https?:\/\/[a-zA-Z0-9_\-\.]*pstatic\.net\/[a-zA-Z0-9_\-\.\/\?=&%\+#:]+/g;
       const matches = html.match(regex) || [];
       
       const ratedImages = matches
         .filter(img => {
           const lower = img.toLowerCase();
-          if (lower.includes('profileimage') || lower.includes('blogpfthumb') || lower.includes('type=f48_48')) {
+          // Exclude profiles, icons, static assets
+          if (lower.includes('profileimage') || lower.includes('blogpfthumb') || 
+              lower.includes('type=f48_48') || lower.includes('type=f30_30') || 
+              lower.includes('type=f54_54') || lower.includes('type=f96_96') ||
+              lower.includes('ssl.pstatic.net') || lower.includes('ntm.pstatic.net') || 
+              lower.includes('static-like.pstatic.net')) {
             return false;
           }
-          return lower.includes('jpeg') || lower.includes('jpg') || lower.includes('png') || lower.includes('type=');
+          return lower.includes('jpeg') || lower.includes('jpg') || lower.includes('png') || lower.includes('type=') || lower.includes('ldb-phinf');
         })
         .map(img => {
           let score = 0;
@@ -89,8 +94,12 @@ async function crawlImageForRestaurant(r) {
             score = 10;
           } else if (lower.includes('blogfiles')) {
             score = 5;
+          } else if (lower.includes('csearch-phinf')) {
+            score = 3;
           } else if (lower.includes('clip-service')) {
             score = 2;
+          } else {
+            score = 1;
           }
           return { img, score };
         });
@@ -98,7 +107,15 @@ async function crawlImageForRestaurant(r) {
       ratedImages.sort((a, b) => b.score - a.score);
       
       if (ratedImages.length > 0) {
-        return { success: true, img: ratedImages[0].img };
+        let bestImg = ratedImages[0].img;
+        if (bestImg.includes('search.pstatic.net')) {
+          if (bestImg.includes('type=')) {
+            bestImg = bestImg.replace(/type=[^&]+/g, 'type=w560_sharpen');
+          } else {
+            bestImg = bestImg.includes('?') ? `${bestImg}&type=w560_sharpen` : `${bestImg}?type=w560_sharpen`;
+          }
+        }
+        return { success: true, img: bestImg };
       } else {
         return { success: true, img: 'no_image' };
       }
@@ -123,7 +140,7 @@ async function run() {
   let noImageCount = 0;
   let failCount = 0;
   let activeIndex = 0;
-  const CONCURRENCY = 2;
+  const CONCURRENCY = 5;
   
   const worker = async () => {
     while (true) {
@@ -132,8 +149,9 @@ async function run() {
       
       const r = restaurants[i];
       
-      // Skip if it already has a valid image URL starting with http
-      if (r.image && r.image.startsWith('http')) {
+      // Skip if it already has a valid high-resolution image URL starting with http
+      if (r.image && r.image.startsWith('http') && 
+          (r.image.includes('ldb-phinf') || r.image.includes('w560_sharpen') || r.image.includes('sc960_832'))) {
         continue;
       }
       
@@ -158,7 +176,7 @@ async function run() {
         fs.writeFileSync(RESTAURANTS_FILE, JSON.stringify(restaurants, null, 2), 'utf8');
       }
       
-      const sleepTime = 500 + Math.random() * 1000;
+      const sleepTime = 200 + Math.random() * 300;
       await new Promise(resolve => setTimeout(resolve, sleepTime));
     }
   };

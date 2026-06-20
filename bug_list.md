@@ -1368,3 +1368,89 @@ Cycle 22 (요청된 Cycle 11 단계) 정밀 검토 결과, **코드베이스 내
   - 반응형 UI/UX 부문에서도 모바일 Safari의 `100dvh` 뷰포트 스타일이 정상 정의되어 있고, 모바일 화면에서 미식 툴킷 닫기 버튼이 가로 네비게이션 탭 영역을 침범하지 않도록 상단 헤더로 구조화되어 렌더링되고 있음을 교차 검증하였습니다.
   - 따라서 현재 코드베이스에서 추가적으로 발견된 기술적 결함이나 모바일 responsiveness 오작동, 상태 동기화 누락 건은 존재하지 않으며 매우 안정적이고 청결하게 유지되고 있습니다.
 
+---
+
+## Cycle 55. 종합 검증 및 보안/UX 안정성 정밀 스캔 리포트 (Cycle 55 Quality Assurance & Logic Spec Scan)
+
+* **검토 일시**: 2026-06-20
+* **TypeScript 컴파일 검증**: 성공 (0 Errors, 0 Warnings)
+* **ESLint 정적 분석 검증**: 성공 (0 Errors, 0 Warnings)
+
+### 발견된 신규 에지 케이스 및 보안/UX 결함 (New Issues & Security/UX Gaps)
+
+## 34. GPS 탐색 시 잠금(Top 10) 검증 우회 및 필터 해제 누락 결함 (GPS Bypass & Filter Desync)
+* **상태**: 버그 (Security Bypass)
+* **위치**: `src/App.tsx` (Line 581)
+* **설명**: 
+  - `App.tsx`의 `handleGPSClick` 내에서 가장 가까운 맛집을 포커싱할 때, 공통 선택 래퍼인 `handleSelectRestaurant` 대신 `setSelectedRestaurant(nearestRes)` 상태 설정 함수를 직접 호출하고 있습니다.
+  - 이로 인해 사용자가 물리적으로 전국 Top 10 노포 근처에 있거나 GPS 좌표를 모사하여 GPS 버튼을 누르면, Top 10 컬럼의 잠금 상태 검증 로직이 작동하지 않고 상세 정보 카드와 좌표 팝업이 그대로 화면에 활성화되는 보안 우회 취약점이 발생합니다.
+  - 아울러, 필터 조건 불일치 시 기존 필터 설정을 초기화해주는 필터 해제 로직(`selectedCategory` 등을 전체로 원복)도 동작하지 않아 상태 동기화 누락을 유발합니다.
+* **해결 방안**: 
+  - `setSelectedRestaurant(nearestRes)` 호출을 공통 핸들러인 `handleSelectRestaurant(nearestRes)` 호출로 변경하여 검증 및 필터 해제 흐름을 통일해야 합니다.
+
+## 35. 흔들기 추천(Shake Match) 결과 창에서 잠긴 Top 10 노포 상세 정보 유출 결함 (Shake Match Info Leak)
+* **상태**: 버그 (Logic/Security Bypass)
+* **위치**: `src/components/Sidebar.tsx` (Line 173-174)
+* **설명**: 
+  - `Sidebar.tsx`의 셔플/흔들기 기능(`triggerShake` 함수) 실행 시 전체 `restaurants` 목록에서 난수를 뽑아 결과를 선정합니다.
+  - 이때 선정된 맛집이 전국 Top 10 리스트에 포함되어 있으며 아직 잠금 상태(`!unlockProgress.isUnlocked`)인 경우에도, 결과 모달을 열어주는 `setShakeResultRestaurant(finalRest)` 상태가 무조건 호출됩니다.
+  - 이로 인해 마커 선택 및 상세 패널은 잠금 처리되어 열리지 않더라도, 흔들기 결과 팝업창 내부 카드에는 해당 비밀 맛집의 상호명, 주소, 대표메뉴, 평점 등이 완전히 노출되어 공유 보증 미션 우회 수단으로 악용될 수 있습니다.
+* **해결 방안**: 
+  - `triggerShake` 선정부에서 선정 대상 풀을 구성할 때, 해금 상태가 아니라면 Top 10 노포 식당들을 후보군(`top10Ids`)에서 사전 제외하는 필터 가드를 배치해야 합니다.
+
+## 36. 다중 코스 딥링크 수신 시 잠금(Top 10) 식당 필터링 누락에 따른 핀/팝업 노출 결함 (Deep Link Route Bypass)
+* **상태**: 버그 (Security Bypass)
+* **위치**: `src/App.tsx` (Line 699-715), `src/components/GourmetMap.tsx` (Line 153-160)
+* **설명**: 
+  - 외부 쿼리스트링 코스 딥링크(`?route=id1,id2...`)를 처리하여 `routeRestaurants` 상태에 주입할 때, 개별 식당의 잠금 해제 권한을 전혀 대조하지 않습니다.
+  - 만약 공유나 미식일기 작성을 완료하지 않은 상태의 일반 유저가 Top 10 맛집 ID가 포함된 코스 링크로 인입하면, 해당 식당이 `routeRestaurants`에 그대로 등록되고, 지도 컴포넌트(`GourmetMap.tsx`)는 이를 마커 및 노선도로 강제 렌더링합니다.
+  - 이에 따라 지도상에 마커 핀이 표시되고, 마커를 클릭하면 Leaflet 고유 팝업창을 통해 식당 이름, 평점, 주소가 여과 없이 표시됩니다.
+* **해결 방안**: 
+  - 딥링크 파싱 시 `!unlockProgress.isUnlocked`인 상태라면 `route` 매칭 결과에서 Top 10 맛집에 속하는 식당을 제거하거나 딥링크 처리를 거부하는 검증 구문을 추가해야 합니다.
+
+## 37. 코스 플래너 내 좌표 누락 맛집 등록으로 인한 외부 지도 길찾기 연동 실패 결함 (Course Planner Undefined Coordinate Crash)
+* **상태**: UX 결함 / 오작동
+* **위치**: `src/components/GourmetToolkit.tsx` (Line 2448-2454, 2626-2630, 2671-2679)
+* **설명**: 
+  - 코스 플래너에서 추가할 맛집을 고르는 셀렉터 옵션 목록은 위도/경도가 유효하지 않은(예: 주소 불분명으로 지오코딩이 누락되거나 오류 상태인) 식당도 필터링 없이 노출합니다.
+  - 사용자가 좌표가 없는 맛집을 코스에 포함시킨 뒤 카카오맵/네이버맵 길찾기 내보내기를 누르면, URL 생성 로직에서 `${way.latitude}`가 `undefined`로 파싱되어 `undefined,undefined,식당명` 형태의 비정상적인 파라미터가 조립됩니다. 이는 연동 브라우저 페이지 로드 실패 또는 내비게이션 크래시를 유발합니다.
+* **해결 방안**: 
+  - 코스 플래너 드롭다운 목록 생성 시 위경도 좌표 속성이 존재하고 유효한(`r.latitude !== undefined && r.longitude !== undefined`) 식당들만 옵션으로 노출하도록 필터를 보강해야 합니다.
+
+## 38. 엑셀 업로드 시 평점 '0' 기록 항목의 기본값(4.5) 강제 오버라이트 오류 (Falsy Rating Fallback Bug)
+* **상태**: 데이터 무결성 버그
+* **위치**: `src/utils/excel.ts` (Line 153)
+* **설명**: 
+  - 엑셀 파일을 읽어와 JSON 모델로 가공하는 구문에서 `let rating = parseFloat(String(row['평점'] || row['rating'] || '4.5'))` 코드를 사용합니다.
+  - 만약 맛집에 불만족하여 엑셀 파일 내에 평점을 `0` 또는 `0.0` 점으로 표기해 둔 행이 존재할 시, `0`은 JavaScript 내에서 Falsy 값으로 판별되므로 삼항 조건 및 Falsy 연산에 의해 우측의 디폴트 값인 `'4.5'`로 강제 덮어쓰기되어 저장되는 왜곡 현상이 발생합니다.
+* **해결 방안**: 
+  - `||` 연산자를 사용하는 대신, `row['평점']` 및 `row['rating']` 값이 `undefined` 또는 `null`인 경우에만 `'4.5'`를 대체 적용하도록 널 병합 연산자(`??`) 등을 활용한 엄격한 nullish 체크로 개선해야 합니다.
+
+## 39. 신규 웰컴/해금/결정 모달의 Leaflet 지도 배경 이벤트 버블링(Scroll/Click) 미차단 결함 (Overlay Scroll/Click Propagation)
+* **상태**: UI/UX 결함
+* **위치**: `src/App.tsx` (웰컴 모달), `src/components/Sidebar.tsx` (해금 모달, 흔들기 결과 모달)
+* **설명**: 
+  - 신규 웰컴/PWA 가이드 모달, 시크릿 컬렉션 해금 안내 모달, 흔들기 결과 모달은 모두 화면을 불투명하게 덮는 fixed 오버레이 패널임에도 불구하고 Leaflet 지도와의 마우스/터치 이벤트 전파 격리 조치가 설계되어 있지 않습니다.
+  - 이로 인해 모달 내 가이드 라인을 스크롤하거나 모달 내부를 클릭/더블클릭할 때, 해당 이벤트가 투과되어 배경의 오픈스트리트맵이 동시에 줌인/줌아웃되거나 카메라가 흔들려 움직이는 심각한 화면 간섭 결함을 유발합니다.
+* **해결 방안**: 
+  - 각 모달 최외각 돔 컨테이너에 Ref를 설정하고, 컴포넌트 마운트 시 `L.DomEvent.disableScrollPropagation(container)` 및 `disableClickPropagation(container)`을 적용하여 하부 지도로의 전파를 전면 차단해야 합니다.
+
+## 40. Leaflet 정보 팝업(Popup) 내 클릭 시 지도 클릭 핸들러 트리거로 인한 강제 닫힘 결함 (Popup Click Bubble)
+* **상태**: UX 결함
+* **위치**: `src/components/GourmetMap.tsx` (Line 260-272)
+* **설명**: 
+  - 지도 위 핀을 누르면 노출되는 Leaflet 빌트인 팝업창(`.leaflet-popup-content-wrapper`) 내부 텍스트를 드래그 복사하거나 클릭할 때, 클릭 이벤트 버블링이 차단되지 않고 지도 캔버스 자체로 전파됩니다.
+  - 이로 인해 Leaflet 맵의 공백 클릭 리스너인 `map.on('click', () => onSelectRestaurant(null))`이 실행되어 상세 카드 패널과 팝업창이 즉시 닫혀버리는 불안정한 인터랙션 오작동이 나타납니다.
+* **해결 방안**: 
+  - 팝업 마운트 시 생성되는 DOM 요소 혹은 팝업 콘텐츠 내의 상호작용에 대해 click/mousedown 이벤트 전파를 강제로 차단하는 핸들러를 정의하거나 Leaflet 팝업 고유 설정에서 propagation 차단 옵션을 확인해야 합니다.
+
+## 41. 상세 패널(DetailPanel) 레이아웃 오버레이에 의한 Leaflet 줌 컨트롤 조작 불능 결함 (Layout Overlay Collision)
+* **상태**: UI/UX 결함
+* **위치**: `src/components/DetailPanel.tsx` (전반), `src/components/GourmetMap.tsx` (Line 83-85)
+* **설명**: 
+  - Leaflet 지도의 화면 줌 조작용 컨트롤(+/-)이 우측 하단(`bottomright`)에 위치하고 있습니다.
+  - 그러나 특정 식당 선택 시 우측 하단에 생성되는 `DetailPanel`은 가로 400px(모바일의 경우 100%)을 점유하여 해당 영역을 불투명하게 덮어버리며, `zIndex: 1100`으로 줌 컨트롤 버튼 위에 놓이게 됩니다.
+  - 이로 인해 식당 정보 상세 보기가 켜져 있는 동안에는 우하단의 줌 버튼 조작이 불가능해집니다.
+* **해결 방안**: 
+  - 맛집 상세 패널이 활성화되어 노출되는 시점에는 Leaflet 줌 컨트롤 버튼을 좌상단/우상단 등 타 영역으로 임시 이동시키거나, 지도 컴포넌트의 컨트롤 배치 위치를 겹치지 않는 영역으로 고정 설정해야 합니다.
+

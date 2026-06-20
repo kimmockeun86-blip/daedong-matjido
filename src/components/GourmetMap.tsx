@@ -79,13 +79,22 @@ export default function GourmetMap({
     }).addTo(map);
     tileLayerRef.current = tile;
 
-    // 줌 컨트롤을 우하단(bottomright)에 배치
+    // 줌 컨트롤을 우상단(topright)에 배치 (Bug 41)
     L.control.zoom({
-      position: 'bottomright'
+      position: 'topright'
     }).addTo(map);
 
     mapRef.current = map;
     markerGroupRef.current = L.featureGroup().addTo(map);
+
+    // Bug 40: Attach a 'popupopen' event listener to disable click/scroll propagation on popups
+    map.on('popupopen', (e) => {
+      const popupEl = e.popup.getElement();
+      if (popupEl) {
+        L.DomEvent.disableClickPropagation(popupEl);
+        L.DomEvent.disableScrollPropagation(popupEl);
+      }
+    });
 
     // 지도 빈 공간 클릭 시 선택 해제 및 상세 패널 닫기
     map.on('click', () => {
