@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { X, MapPin, Phone, Award, Navigation, Share2, Copy, CheckCircle, Heart, Calculator, Sparkles } from 'lucide-react';
 import type { RestaurantRaw } from '../utils/excel';
 import L from 'leaflet';
+import { CATEGORY_IMAGES } from '../constants/images';
 
 // 카테고리별 프리미엄 Unsplash 음식 이미지 컬렉션 (다양성을 위해 해시 매핑)
 const safeCopyToClipboard = (text: string): Promise<void> => {
@@ -38,35 +39,7 @@ const safeCopyToClipboard = (text: string): Promise<void> => {
   });
 };
 
-const CATEGORY_IMAGES: Record<string, string[]> = {
-  '한식': [
-    'https://images.unsplash.com/photo-1596797038530-2c107229654b?w=600&auto=format&fit=crop', // 비빔밥
-    'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=600&auto=format&fit=crop'  // 한식 상차림
-  ],
-  '중식': [
-    'https://images.unsplash.com/photo-1585032226651-759b368d7246?w=600&auto=format&fit=crop', // 볶음면
-    'https://images.unsplash.com/photo-1563245372-f21724e3856d?w=600&auto=format&fit=crop'  // 딤섬
-  ],
-  '일식': [
-    'https://images.unsplash.com/photo-1579871494447-9811cf80d66c?w=600&auto=format&fit=crop', // 초밥
-    'https://images.unsplash.com/photo-1611143669185-af224c5e3252?w=600&auto=format&fit=crop'  // 일식 라멘
-  ],
-  '양식': [
-    'https://images.unsplash.com/photo-1513104890138-7c749659a591?w=600&auto=format&fit=crop', // 피자
-    'https://images.unsplash.com/photo-1544025162-d76694265947?w=600&auto=format&fit=crop'  // 바베큐/스테이크
-  ],
-  '분식': [
-    'https://images.unsplash.com/photo-1498654896293-37aacf113fd9?w=600&auto=format&fit=crop', // 한식 테이블
-    'https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?w=600&auto=format&fit=crop'  // 군만두/면
-  ],
-  '육류': [
-    'https://images.unsplash.com/photo-1603048588665-791ca8aea617?w=600&auto=format&fit=crop', // 소고기 구이
-    'https://images.unsplash.com/photo-1529193591184-b1d58069ecdd?w=600&auto=format&fit=crop'  // 삼겹살 구이류
-  ],
-  '기타': [
-    'https://images.unsplash.com/photo-1498837167922-ddd27525d352?w=600&auto=format&fit=crop'  // 풍성한 테이블
-  ]
-};
+// CATEGORY_IMAGES is imported from shared constants
 
 // 지역 한글에 맞춰 알맞은 번호 국번 생성 및 난수 생성기
 function getDeterministicPhoneNumber(address: string, name: string): string {
@@ -156,8 +129,15 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
     const restaurantKey = restaurant.id || restaurant.name;
     return allLogs[restaurantKey] || allLogs[restaurant.name] || [];
   });
+  // 4. 상단 음식 실사진 상태 및 Unsplash 폴백 설정 (동기식 useState 및 컴포넌트 Remount 리셋 활용)
+  const imageList = restaurant ? (CATEGORY_IMAGES[restaurant.category] || CATEGORY_IMAGES['기타']) : CATEGORY_IMAGES['기타'];
+  const imageIndex = restaurant 
+    ? Math.abs(restaurant.name.split('').reduce((acc, curr) => acc + curr.charCodeAt(0), 0)) % imageList.length
+    : 0;
+  const headerImage = (restaurant && restaurant.image && restaurant.image !== 'no_image') ? restaurant.image : imageList[imageIndex];
+  const fallbackImg = imageList[imageIndex];
 
-
+  const [imageSrc, setImageSrc] = useState(headerImage);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
@@ -284,12 +264,6 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
 
   // Deterministic 전화번호 획득
   const phone = getDeterministicPhoneNumber(restaurant.address, restaurant.name);
-
-  // 상호명 기반 고정 이미지 인덱스 결정
-  const imageList = CATEGORY_IMAGES[restaurant.category] || CATEGORY_IMAGES['기타'];
-  const imageIndex = Math.abs(restaurant.name.split('').reduce((acc, curr) => acc + curr.charCodeAt(0), 0)) % imageList.length;
-  const headerImage = (restaurant.image && restaurant.image !== 'no_image') ? restaurant.image : imageList[imageIndex];
-
 
   // 카테고리별 뱃지 컬러 테마 지정
   let badgeBg = 'rgba(249, 115, 22, 0.9)';
@@ -429,11 +403,25 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
         position: 'relative',
         width: '100%',
         height: isMobile ? '160px' : '240px',
-        backgroundImage: `url("${headerImage}")`,
-        backgroundSize: 'cover',
-        backgroundPosition: 'center',
+        overflow: 'hidden',
         flexShrink: 0
       }}>
+        <img 
+          src={imageSrc} 
+          alt={restaurant.name}
+          referrerPolicy="no-referrer"
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'cover',
+            objectPosition: 'center'
+          }}
+          onError={() => {
+            if (imageSrc !== fallbackImg) {
+              setImageSrc(fallbackImg);
+            }
+          }}
+        />
         {/* 어두운 그라디언트 오버레이 */}
         <div style={{
           position: 'absolute',

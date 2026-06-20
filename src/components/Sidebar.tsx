@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
 import { Search, MapPin, Compass, Navigation, BarChart3, X } from 'lucide-react';
 import type { RestaurantRaw } from '../utils/excel';
 import L from 'leaflet';
+import { CATEGORY_IMAGES } from '../constants/images';
 
 const safeCopyToClipboard = (text: string): Promise<void> => {
   if (navigator.clipboard && navigator.clipboard.writeText) {
@@ -1125,6 +1126,9 @@ export default function Sidebar({
                     badgeColor = 'var(--accent-pink)';
                   }
 
+                  const fallbackImage = CATEGORY_IMAGES[res.category]?.[0] || CATEGORY_IMAGES['기타'][0];
+                  const initialImage = res.image && res.image !== 'no_image' ? res.image : fallbackImage;
+
                   return (
                     <div
                       key={idx}
@@ -1136,7 +1140,7 @@ export default function Sidebar({
                         }
                       }}
                       style={{
-                        padding: '16px',
+                        padding: '12px',
                         borderRadius: '12px',
                         background: isSelected ? 'rgba(6, 182, 212, 0.08)' : 'rgba(30, 41, 59, 0.35)',
                         border: isSelected 
@@ -1148,8 +1152,8 @@ export default function Sidebar({
                         cursor: 'pointer',
                         transition: 'all 0.25s',
                         display: 'flex',
-                        flexDirection: 'column',
-                        gap: '10px',
+                        flexDirection: 'row',
+                        gap: '12px',
                         filter: isLockedItem ? 'blur(4.5px)' : 'none',
                         opacity: isLockedItem ? 0.5 : 1,
                         userSelect: isLockedItem ? 'none' : 'auto'
@@ -1169,97 +1173,130 @@ export default function Sidebar({
                         }
                       }}
                     >
-                      {/* 카드 헤더 (음식종류, 상호명, 주소) */}
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', maxWidth: '70%' }}>
-                          <span style={{
-                            fontSize: '10px',
-                            fontWeight: '800',
-                            padding: '2px 6px',
-                            borderRadius: '4px',
-                            background: badgeBg,
-                            color: badgeColor
-                          }}>
-                            {res.category}
-                          </span>
-                          {isSponsored && (
+                      {/* 썸네일 이미지 */}
+                      <div style={{
+                        width: '70px',
+                        height: '70px',
+                        borderRadius: '8px',
+                        overflow: 'hidden',
+                        flexShrink: 0,
+                        position: 'relative',
+                        border: '1px solid rgba(255, 255, 255, 0.08)'
+                      }}>
+                        <img 
+                          src={initialImage} 
+                          alt={res.name}
+                          referrerPolicy="no-referrer"
+                          style={{
+                            width: '100%',
+                            height: '100%',
+                            objectFit: 'cover'
+                          }}
+                          onError={(e) => {
+                            if (e.currentTarget.src !== fallbackImage) {
+                              e.currentTarget.src = fallbackImage;
+                            }
+                          }}
+                        />
+                      </div>
+
+                      {/* 우측 상세 정보 */}
+                      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '6px', minWidth: 0 }}>
+                        {/* 카드 헤더 (음식종류, 상호명, 주소) */}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '8px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', maxWidth: '75%', minWidth: 0 }}>
                             <span style={{
                               fontSize: '9px',
                               fontWeight: '800',
-                              padding: '2px 6px',
-                              borderRadius: '4px',
-                              background: 'rgba(234, 179, 8, 0.12)',
-                              color: 'var(--accent-yellow)',
-                              border: '1px solid rgba(234, 179, 8, 0.25)'
+                              padding: '1px 4px',
+                              borderRadius: '3px',
+                              background: badgeBg,
+                              color: badgeColor,
+                              flexShrink: 0
                             }}>
-                              🌟 제휴 노포
+                              {res.category}
                             </span>
-                          )}
-                          <span style={{ fontSize: '15px', fontWeight: '800', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            {res.name}
+                            {isSponsored && (
+                              <span style={{
+                                fontSize: '8px',
+                                fontWeight: '800',
+                                padding: '1px 4px',
+                                borderRadius: '3px',
+                                background: 'rgba(234, 179, 8, 0.12)',
+                                color: 'var(--accent-yellow)',
+                                border: '1px solid rgba(234, 179, 8, 0.25)',
+                                flexShrink: 0
+                              }}>
+                                🌟 제휴
+                              </span>
+                            )}
+                            <span style={{ fontSize: '13px', fontWeight: '800', color: '#f8fafc', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                              {res.name}
+                            </span>
+                          </div>
+                          <span style={{ fontSize: '9px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
+                            <MapPin size={9} />
+                            {res.city || res.region || '전국'}
                           </span>
                         </div>
-                        <span style={{ fontSize: '10px', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '2px', flexShrink: 0 }}>
-                          <MapPin size={10} />
-                          {res.address}
-                        </span>
-                      </div>
 
-                      {/* 대표메뉴 */}
-                      {res.menu && (
-                        <div style={{ fontSize: '12px', fontWeight: '700', color: 'var(--accent-cyan)' }}>
-                          대표메뉴: <span style={{ color: '#f8fafc', fontWeight: '500' }}>{res.menu}</span>
+                        {/* 대표메뉴 */}
+                        {res.menu && (
+                          <div style={{ fontSize: '11px', fontWeight: '700', color: 'var(--accent-cyan)' }}>
+                            메뉴: <span style={{ color: '#cbd5e1', fontWeight: '500' }}>{res.menu}</span>
+                          </div>
+                        )}
+
+                        {/* 추천사유 본문 */}
+                        {res.review && (
+                          <p style={{
+                            fontSize: '11px',
+                            color: 'var(--text-secondary)',
+                            lineHeight: '1.3',
+                            display: '-webkit-box',
+                            WebkitLineClamp: 2,
+                            WebkitBoxOrient: 'vertical',
+                            overflow: 'hidden',
+                            textOverflow: 'ellipsis',
+                            margin: 0
+                          }}>
+                            {res.review}
+                          </p>
+                        )}
+
+                        {/* 네온 하단 태그 */}
+                        <div style={{ display: 'flex', gap: '6px', marginTop: '2px' }}>
+                          <span style={{
+                            fontSize: '8px',
+                            fontWeight: '700',
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            border: '1px solid rgba(16, 185, 129, 0.25)',
+                            background: 'rgba(16, 185, 129, 0.04)',
+                            color: 'var(--accent-green)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}>
+                            <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: 'var(--accent-green)' }}></span>
+                            핀 활성화
+                          </span>
+                          <span style={{
+                            fontSize: '8px',
+                            fontWeight: '700',
+                            padding: '1px 4px',
+                            borderRadius: '3px',
+                            border: '1px solid rgba(139, 92, 246, 0.25)',
+                            background: 'rgba(139, 92, 246, 0.04)',
+                            color: 'var(--accent-purple)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            gap: '2px'
+                          }}>
+                            <span style={{ width: '3px', height: '3px', borderRadius: '50%', background: 'var(--accent-purple)' }}></span>
+                            실사진
+                          </span>
                         </div>
-                      )}
-
-                      {/* 추천사유 본문 */}
-                      {res.review && (
-                        <p style={{
-                          fontSize: '12px',
-                          color: 'var(--text-secondary)',
-                          lineHeight: '1.4',
-                          display: '-webkit-box',
-                          WebkitLineClamp: 3,
-                          WebkitBoxOrient: 'vertical',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis'
-                        }}>
-                          {res.review}
-                        </p>
-                      )}
-
-                      {/* 네온 하단 태그 */}
-                      <div style={{ display: 'flex', gap: '8px', marginTop: '2px' }}>
-                        <span style={{
-                          fontSize: '9px',
-                          fontWeight: '700',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          border: '1px solid rgba(16, 185, 129, 0.25)',
-                          background: 'rgba(16, 185, 129, 0.04)',
-                          color: 'var(--accent-green)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '3px'
-                        }}>
-                          <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--accent-green)' }}></span>
-                          지도 핀 활성화
-                        </span>
-                        <span style={{
-                          fontSize: '9px',
-                          fontWeight: '700',
-                          padding: '2px 6px',
-                          borderRadius: '4px',
-                          border: '1px solid rgba(139, 92, 246, 0.25)',
-                          background: 'rgba(139, 92, 246, 0.04)',
-                          color: 'var(--accent-purple)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '3px'
-                        }}>
-                          <span style={{ width: '4px', height: '4px', borderRadius: '50%', background: 'var(--accent-purple)' }}></span>
-                          실사진 보유
-                        </span>
                       </div>
 
                     </div>

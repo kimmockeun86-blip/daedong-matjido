@@ -8,6 +8,7 @@ import type { RestaurantRaw } from './utils/excel';
 import { geocodeAddress, getDefaultFallbackCoordinates } from './utils/geocoder';
 import { Sparkles } from 'lucide-react';
 import L from 'leaflet';
+import defaultRestaurants from '../public/restaurants.json';
 
 const LOCAL_STORAGE_KEY = 'daedong_restaurants_data';
 
@@ -217,9 +218,9 @@ export default function App() {
   // 지오코딩 변환 진행 상태
   const [geocodingProgress, setGeocodingProgress] = useState<{ current: number; total: number } | null>(null);
 
-  // 1. 초기 마운트 시 맛집 데이터 로드 (로컬스토리지 우선, 없을 시 /restaurants.json 자동 로드, 기존 데이터 최신 이미지 병합)
+  // 1. 초기 마운트 시 맛집 데이터 로드 (로컬스토리지 우선, 없을 시 defaultRestaurants 자동 로드, 기존 데이터 최신 이미지 병합)
   useEffect(() => {
-    const loadInitialData = async () => {
+    const initializeData = () => {
       try {
         const savedData = localStorage.getItem(LOCAL_STORAGE_KEY);
         let parsed: Partial<RestaurantRaw>[] | null = null;
@@ -232,31 +233,34 @@ export default function App() {
           }
         }
 
-        // 최신 이미지 동기화를 위해 /restaurants.json 항상 가져오기
-        let defaultData: Partial<RestaurantRaw>[] = [];
-        try {
-          const response = await fetch('/restaurants.json');
-          if (response.ok) {
-            defaultData = await response.json();
-          }
-        } catch (e) {
-          console.error('Failed to fetch default restaurants.json for sync', e);
-        }
+        const defaultData = defaultRestaurants as Partial<RestaurantRaw>[];
 
         if (parsed && Array.isArray(parsed)) {
           // 기본 맛집 목록의 이미지와 매핑하여 캐시된 데이터에 병합 (Cycle 26 Auto-Sync)
           const defaultImageMap = new Map<string, string>();
+          const defaultImageByNameMap = new Map<string, string>();
+          const nameCounts = new Map<string, number>();
+
+          defaultData.forEach(r => {
+            if (r.name) {
+              nameCounts.set(r.name, (nameCounts.get(r.name) || 0) + 1);
+            }
+          });
+
           defaultData.forEach(r => {
             if (r.name && r.image) {
               const key = `${r.name}_${r.address || ''}`.trim();
               defaultImageMap.set(key, r.image);
+              if (nameCounts.get(r.name) === 1) {
+                defaultImageByNameMap.set(r.name, r.image);
+              }
             }
           });
 
           let hasMergedNewImages = false;
           const merged = parsed.map(r => {
             const key = `${r.name}_${r.address || ''}`.trim();
-            const defaultImg = defaultImageMap.get(key);
+            const defaultImg = defaultImageMap.get(key) || defaultImageByNameMap.get(r.name || '');
             if (defaultImg) {
               const isCachedValid = r.image && r.image.startsWith('http');
               const isDefaultValid = defaultImg.startsWith('http');
@@ -288,7 +292,10 @@ export default function App() {
         console.error('초기 맛집 데이터 로드 실패:', err);
       }
     };
-    loadInitialData();
+
+    // React 19의 동기식 setState 호출 경고를 방지하기 위해 비동기로 실행
+    const timer = setTimeout(initializeData, 0);
+    return () => clearTimeout(timer);
   }, []);
 
   // 1.5. AI SEO Structured Data (JSON-LD rich snippet injection)
