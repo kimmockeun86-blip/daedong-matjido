@@ -36,6 +36,112 @@ const ensureRestaurantIds = (data: Partial<RestaurantRaw>[]): RestaurantRaw[] =>
   });
 };
 
+// 기본 데이터셋의 이미지를 대상 식당 데이터셋에 병합하는 헬퍼 함수 (O(1) 인덱스 매칭 및 지명+주소 정밀 매칭 적용)
+const mergeDefaultImages = (parsed: Partial<RestaurantRaw>[]): Partial<RestaurantRaw>[] => {
+  const defaultData = defaultRestaurants as Partial<RestaurantRaw>[];
+  if (!defaultData || defaultData.length === 0) return parsed;
+
+  const normalizeAddress = (addr: string): string => {
+    return (addr || '')
+      .replace(/[\s,.-]/g, '')
+      .replace(/서울특별시/g, '서울')
+      .replace(/서울시/g, '서울')
+      .replace(/경기도/g, '경기')
+      .replace(/강원특별자치도/g, '강원')
+      .replace(/강원도/g, '강원')
+      .replace(/충청북도/g, '충북')
+      .replace(/충북/g, '충북')
+      .replace(/충청남도/g, '충남')
+      .replace(/충남/g, '충남')
+      .replace(/전라북도/g, '전북')
+      .replace(/전북특별자치도/g, '전북')
+      .replace(/전라남도/g, '전남')
+      .replace(/전남/g, '전남')
+      .replace(/경상북도/g, '경북')
+      .replace(/경북/g, '경북')
+      .replace(/경상남도/g, '경남')
+      .replace(/경남/g, '경남')
+      .replace(/제주특별자치도/g, '제주')
+      .replace(/제주도/g, '제주')
+      .replace(/광주광역시/g, '광주')
+      .replace(/대구광역시/g, '대구')
+      .replace(/대전광역시/g, '대전')
+      .replace(/부산광역시/g, '부산')
+      .replace(/울산광역시/g, '울산')
+      .replace(/인천광역시/g, '인천')
+      .toLowerCase();
+  };
+
+  const nameCounts = new Map<string, number>();
+  const defaultImageByNameMap = new Map<string, string>();
+  const defaultImageMap = new Map<string, string>();
+
+  defaultData.forEach(r => {
+    if (r.name) {
+      nameCounts.set(r.name, (nameCounts.get(r.name) || 0) + 1);
+    }
+  });
+
+  defaultData.forEach(r => {
+    if (r.name && r.image) {
+      const normAddr = normalizeAddress(r.address || '');
+      const key = `${r.name}_${normAddr}`;
+      defaultImageMap.set(key, r.image);
+      if (nameCounts.get(r.name) === 1) {
+        defaultImageByNameMap.set(r.name, r.image);
+      }
+    }
+  });
+
+  return parsed.map((r, idx) => {
+    let defaultImg: string | undefined = undefined;
+
+    // 1순위: 인덱스 및 이름 매칭 (동일 데이터셋 빠른 매칭)
+    if (parsed.length === defaultData.length) {
+      const dRes = defaultData[idx];
+      if (dRes && dRes.name === r.name && dRes.image) {
+        defaultImg = dRes.image;
+      }
+    }
+
+    // 2순위: 이름 + 정규화된 주소 매칭
+    if (!defaultImg && r.name) {
+      const normAddr = normalizeAddress(r.address || '');
+      defaultImg = defaultImageMap.get(`${r.name}_${normAddr}`);
+    }
+
+    // 3순위: 주소 포함 관계 매칭 (부분 주소 매칭)
+    if (!defaultImg && r.name) {
+      const normAddr = normalizeAddress(r.address || '');
+      const match = defaultData.find(d => {
+        if (d.name !== r.name) return false;
+        const dNorm = normalizeAddress(d.address || '');
+        return dNorm.includes(normAddr) || normAddr.includes(dNorm);
+      });
+      if (match) {
+        defaultImg = match.image;
+      }
+    }
+
+    // 4순위: 고유 맛집명 매칭
+    if (!defaultImg && r.name) {
+      defaultImg = defaultImageByNameMap.get(r.name);
+    }
+
+    if (defaultImg) {
+      const isCachedValid = r.image && r.image.startsWith('http');
+      const isDefaultValid = defaultImg.startsWith('http');
+      if (isDefaultValid && (!isCachedValid || r.image === 'no_image')) {
+        return { ...r, image: defaultImg };
+      } else if (!r.image) {
+        return { ...r, image: defaultImg };
+      }
+    }
+    return r;
+  });
+};
+
+
 export default function App() {
   const [restaurants, setRestaurants] = useState<RestaurantRaw[]>([]);
   const geocodingTaskIdRef = useRef(0);
@@ -236,57 +342,28 @@ export default function App() {
         const defaultData = defaultRestaurants as Partial<RestaurantRaw>[];
 
         if (parsed && Array.isArray(parsed)) {
-          // 기본 맛집 목록의 이미지와 매핑하여 캐시된 데이터에 병합 (Cycle 26 Auto-Sync)
-          const defaultImageMap = new Map<string, string>();
-          const defaultImageByNameMap = new Map<string, string>();
-          const nameCounts = new Map<string, number>();
-
-          defaultData.forEach(r => {
-            if (r.name) {
-              nameCounts.set(r.name, (nameCounts.get(r.name) || 0) + 1);
-            }
-          });
-
-          defaultData.forEach(r => {
-            if (r.name && r.image) {
-              const key = `${r.name}_${r.address || ''}`.trim();
-              defaultImageMap.set(key, r.image);
-              if (nameCounts.get(r.name) === 1) {
-                defaultImageByNameMap.set(r.name, r.image);
-              }
-            }
-          });
-
-          let hasMergedNewImages = false;
-          const merged = parsed.map(r => {
-            const key = `${r.name}_${r.address || ''}`.trim();
-            const defaultImg = defaultImageMap.get(key) || defaultImageByNameMap.get(r.name || '');
-            if (defaultImg) {
-              const isCachedValid = r.image && r.image.startsWith('http');
-              const isDefaultValid = defaultImg.startsWith('http');
-              if (isDefaultValid && !isCachedValid) {
-                r.image = defaultImg;
-                hasMergedNewImages = true;
-              } else if (!r.image) {
-                r.image = defaultImg;
-                hasMergedNewImages = true;
-              }
-            }
-            return r;
-          });
-
+          const merged = mergeDefaultImages(parsed);
+          const hasMergedNewImages = merged.some((r, idx) => r.image !== parsed[idx].image);
           const withIds = ensureRestaurantIds(merged);
           setRestaurants(withIds);
           if (hasMergedNewImages) {
             console.log('[AUTO-SYNC] Cached restaurants merged with new crawled images.');
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));
+            try {
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));
+            } catch (e) {
+              console.error('[AUTO-SYNC] Failed to save merged data to localStorage:', e);
+            }
           }
         } else if (defaultData.length > 0) {
           // 로컬스토리지에 없으면 빌드된 맛집 JSON 로드
           console.log('로컬스토리지 데이터 없음, 기본 맛집 데이터 로드 중...');
           const withIds = ensureRestaurantIds(defaultData);
           setRestaurants(withIds);
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));
+          try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));
+          } catch (e) {
+            console.error('Failed to save default data to localStorage:', e);
+          }
         }
       } catch (err) {
         console.error('초기 맛집 데이터 로드 실패:', err);
@@ -349,7 +426,8 @@ export default function App() {
 
     if (missingCoords.length === 0) {
       // 모든 맛집의 좌표가 미리 채워진 경우
-      const withIds = ensureRestaurantIds(rawRestaurants);
+      const merged = mergeDefaultImages(rawRestaurants);
+      const withIds = ensureRestaurantIds(merged);
       setRestaurants(withIds);
       try {
         localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));
@@ -433,7 +511,8 @@ export default function App() {
     }
 
     setGeocodingProgress(null);
-    const withIds = ensureRestaurantIds(updatedRestaurants);
+    const merged = mergeDefaultImages(updatedRestaurants);
+    const withIds = ensureRestaurantIds(merged);
     setRestaurants(withIds);
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(withIds));

@@ -138,6 +138,12 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
   const fallbackImg = imageList[imageIndex];
 
   const [imageSrc, setImageSrc] = useState(headerImage);
+  const [prevHeaderImage, setPrevHeaderImage] = useState(headerImage);
+
+  if (headerImage !== prevHeaderImage) {
+    setPrevHeaderImage(headerImage);
+    setImageSrc(headerImage);
+  }
 
   const containerRef = useRef<HTMLDivElement | null>(null);
 
