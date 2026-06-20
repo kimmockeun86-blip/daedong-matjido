@@ -37,6 +37,14 @@ const safeCopyToClipboard = (text: string): Promise<void> => {
   });
 };
 
+const getShareOrigin = (): string => {
+  const origin = window.location.origin;
+  if (!origin || origin.includes('localhost') || origin.includes('capacitor://') || origin.includes('file://')) {
+    return 'https://daedong.matjido.app';
+  }
+  return origin;
+};
+
 interface GourmetToolkitProps {
   isOpen: boolean;
   onClose: () => void;
@@ -320,16 +328,24 @@ export default function GourmetToolkit({
     ctx.fillStyle = '#ec4899';
     ctx.fillText('daedong-matjido.app', 250, 715);
 
-    // 8. 파일 다운로드 트리거
+    // 8. 파일 다운로드 트리거 (모바일/웹뷰 다운로드 실패 방어)
     const dataUrl = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.download = `대동맛지도_역사연대기_${title.split(' ')[1] || '식객'}.png`;
-    link.href = dataUrl;
-    link.click();
+    const isCapacitor = (window as unknown as { Capacitor?: unknown }).Capacitor !== undefined;
+    if (isCapacitor || isMobile) {
+      setDownloadModalTitle('미식 역사 연대기');
+      setDownloadModalImage(dataUrl);
+    } else {
+      const link = document.createElement('a');
+      link.download = `대동맛지도_역사연대기_${title.split(' ')[1] || '식객'}.png`;
+      link.href = dataUrl;
+      link.click();
+    }
   };
 
   // 10. Tinder 스타일 스와이프 매칭 상태 및 헬퍼
   const [mbtiTabMode, setMbtiTabMode] = useState<'quiz' | 'swipe'>('quiz');
+  const [downloadModalImage, setDownloadModalImage] = useState<string | null>(null);
+  const [downloadModalTitle, setDownloadModalTitle] = useState<string>('');
   const [swipeIndex, setSwipeIndex] = useState(0);
   const [swipeLikes, setSwipeLikes] = useState<string[]>([]);
   const [swipeCompleted, setSwipeCompleted] = useState(false);
@@ -543,7 +559,7 @@ export default function GourmetToolkit({
   const generateSwipeLink = () => {
     const name = swipeUserName.trim() || '친구';
     const likesParam = swipeLikes.join(',');
-    const link = `${window.location.origin}${window.location.pathname}?likes=${likesParam}&senderName=${encodeURIComponent(name)}`;
+    const link = `${getShareOrigin()}${window.location.pathname}?likes=${likesParam}&senderName=${encodeURIComponent(name)}`;
     safeCopyToClipboard(link).then(() => {
       setSwipeLinkCopied(true);
       setTimeout(() => setSwipeLinkCopied(false), 2000);
@@ -862,12 +878,18 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
     ctx.fillStyle = '#06b6d4';
     ctx.fillText('daedong-matjido.app', 250, 715);
 
-    // 9. 파일 다운로드 트리거
+    // 9. 파일 다운로드 트리거 (모바일/웹뷰 다운로드 실패 방어)
     const dataUrl = canvas.toDataURL('image/png');
-    const link = document.createElement('a');
-    link.download = `대동맛지도_정복인증_${userGrade.split(' ')[1] || '식객'}.png`;
-    link.href = dataUrl;
-    link.click();
+    const isCapacitor = (window as unknown as { Capacitor?: unknown }).Capacitor !== undefined;
+    if (isCapacitor || isMobile) {
+      setDownloadModalTitle('미식 등급 인증서');
+      setDownloadModalImage(dataUrl);
+    } else {
+      const link = document.createElement('a');
+      link.download = `대동맛지도_정복인증_${userGrade.split(' ')[1] || '식객'}.png`;
+      link.href = dataUrl;
+      link.click();
+    }
   };
 
   return (
@@ -901,25 +923,58 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
           boxShadow: '0 0 30px rgba(6, 182, 212, 0.15)'
         }}
       >
-        {/* 닫기 버튼 */}
-        <button 
-          onClick={onClose}
-          style={{
-            position: 'absolute',
-            top: '16px',
-            right: '16px',
-            background: 'rgba(255,255,255,0.03)',
-            border: '1px solid rgba(255,255,255,0.06)',
-            color: '#ffffff',
-            cursor: 'pointer',
-            padding: '6px',
-            borderRadius: '50%',
+        {/* 닫기 버튼 (데스크톱 전용 절대 배치) */}
+        {!isMobile && (
+          <button 
+            onClick={onClose}
+            style={{
+              position: 'absolute',
+              top: '16px',
+              right: '16px',
+              background: 'rgba(255,255,255,0.03)',
+              border: '1px solid rgba(255,255,255,0.06)',
+              color: '#ffffff',
+              cursor: 'pointer',
+              padding: '6px',
+              borderRadius: '50%',
+              display: 'flex',
+              zIndex: 10
+            }}
+          >
+            <X size={16} />
+          </button>
+        )}
+
+        {isMobile && (
+          <div style={{
             display: 'flex',
-            zIndex: 10
-          }}
-        >
-          <X size={16} />
-        </button>
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            padding: '16px 16px 8px 16px',
+            background: 'rgba(15, 23, 42, 0.8)',
+            borderBottom: '1px solid var(--border-glass)',
+            flexShrink: 0
+          }}>
+            <div>
+              <div style={{ fontSize: '9px', fontWeight: '800', color: 'var(--accent-orange)', letterSpacing: '0.1em' }}>大東味地圖 TOOL</div>
+              <div style={{ fontSize: '16px', fontWeight: '900', color: '#f8fafc' }}>미식 툴킷</div>
+            </div>
+            <button 
+              onClick={onClose}
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '50%',
+                display: 'flex'
+              }}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
 
         {/* 좌측 탭 네비게이션 */}
         <div style={{
@@ -927,7 +982,7 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
           background: 'rgba(15, 23, 42, 0.6)',
           borderRight: isMobile ? 'none' : '1px solid var(--border-glass)',
           borderBottom: isMobile ? '1px solid var(--border-glass)' : 'none',
-          padding: '20px 16px',
+          padding: isMobile ? '8px 16px' : '20px 16px',
           display: 'flex',
           flexDirection: isMobile ? 'row' : 'column',
           gap: '8px',
@@ -2680,7 +2735,7 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                   disabled={routeRestaurants.length < 2}
                   onClick={() => {
                     const ids = routeRestaurants.map(r => r.id).join(',');
-                    const shareUrl = `${window.location.origin}${window.location.pathname}?route=${ids}`;
+                    const shareUrl = `${getShareOrigin()}${window.location.pathname}?route=${ids}`;
                     safeCopyToClipboard(shareUrl).then(() => {
                       setRouteCopied(true);
                       setTimeout(() => setRouteCopied(false), 2000);
@@ -2918,6 +2973,70 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
 
         </div>
       </div>
+
+      {downloadModalImage && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(2, 6, 17, 0.95)',
+          zIndex: 10000,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'center',
+          alignItems: 'center',
+          padding: '24px'
+        }}>
+          <div style={{
+            width: '100%',
+            maxWidth: '380px',
+            background: 'rgba(15, 23, 42, 0.8)',
+            border: '1px solid var(--border-glass)',
+            borderRadius: '16px',
+            padding: '20px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: '16px',
+            position: 'relative'
+          }}>
+            <button
+              onClick={() => setDownloadModalImage(null)}
+              style={{
+                position: 'absolute',
+                top: '12px',
+                right: '12px',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                color: '#ffffff',
+                cursor: 'pointer',
+                padding: '6px',
+                borderRadius: '50%',
+                display: 'flex'
+              }}
+            >
+              <X size={16} />
+            </button>
+            <div style={{ textAlign: 'center' }}>
+              <h3 style={{ fontSize: '16px', fontWeight: 'bold', color: '#f8fafc', marginBottom: '8px' }}>{downloadModalTitle}</h3>
+              <p style={{ fontSize: '12px', color: 'var(--text-secondary)' }}>💡 이미지를 길게 누르면 기기에 저장할 수 있습니다.</p>
+            </div>
+            <img 
+              src={downloadModalImage} 
+              alt="인증서" 
+              style={{ 
+                width: '100%', 
+                maxHeight: '400px', 
+                objectFit: 'contain',
+                borderRadius: '8px',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.5)'
+              }} 
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

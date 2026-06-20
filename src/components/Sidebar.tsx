@@ -38,6 +38,14 @@ const safeCopyToClipboard = (text: string): Promise<void> => {
   });
 };
 
+const getShareOrigin = (): string => {
+  const origin = window.location.origin;
+  if (!origin || origin.includes('localhost') || origin.includes('capacitor://') || origin.includes('file://')) {
+    return 'https://daedong.matjido.app';
+  }
+  return origin;
+};
+
 interface SidebarProps {
   restaurants: RestaurantRaw[];
   filteredRestaurants: RestaurantRaw[];
@@ -1486,7 +1494,7 @@ export default function Sidebar({
 
               <button
                 onClick={() => {
-                  const text = `[대동맛지도 초대장]\n7년간 직접 발로 뛴 전국 백년노포 대공개! 지금 대동맛지도에서 확인해보세요.\n링크: ${window.location.origin}`;
+                  const text = `[대동맛지도 초대장]\n7년간 직접 발로 뛴 전국 백년노포 대공개! 지금 대동맛지도에서 확인해보세요.\n링크: ${getShareOrigin()}`;
                   safeCopyToClipboard(text).then(() => {
                     alert('초대장 문구가 복사되었습니다! 친구나 단톡방에 공유해 보세요.');
                     try {
@@ -1626,7 +1634,7 @@ export default function Sidebar({
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginTop: '4px' }}>
               <button
                 onClick={() => {
-                  const shareText = `결정장애 종결! 대동맛지도를 흔들어서 5초 만에 결정한 오늘의 맛집: ${shakeResultRestaurant.name} (${shakeResultRestaurant.category}) - ${shakeResultRestaurant.address}\n바로 확인: ${window.location.origin}/?id=${shakeResultRestaurant.id}`;
+                  const shareText = `결정장애 종결! 대동맛지도를 흔들어서 5초 만에 결정한 오늘의 맛집: ${shakeResultRestaurant.name} (${shakeResultRestaurant.category}) - ${shakeResultRestaurant.address}\n바로 확인: ${getShareOrigin()}/?id=${shakeResultRestaurant.id}`;
                   safeCopyToClipboard(shareText)
                     .then(() => alert('결정된 맛집 정보가 클립보드에 복사되었습니다. 친구들과 카톡방에 공유해보세요!'))
                     .catch(() => alert('복사에 실패했습니다. 직접 복사해주세요.'));
