@@ -58,12 +58,14 @@ export default function App() {
     try {
       const diaryVal = localStorage.getItem('daedong_diary');
       if (diaryVal) {
-        const diaryObj = JSON.parse(diaryVal) as Record<string, unknown>;
-        Object.values(diaryObj).forEach((logsArr) => {
-          if (Array.isArray(logsArr)) {
-            logs += logsArr.length;
-          }
-        });
+        const diaryObj = JSON.parse(diaryVal);
+        if (diaryObj && typeof diaryObj === 'object' && !Array.isArray(diaryObj)) {
+          Object.values(diaryObj).forEach((logsArr) => {
+            if (Array.isArray(logsArr)) {
+              logs += logsArr.length;
+            }
+          });
+        }
       }
     } catch {
       // ignore
@@ -94,12 +96,14 @@ export default function App() {
     try {
       const diaryVal = localStorage.getItem('daedong_diary');
       if (diaryVal) {
-        const diaryObj = JSON.parse(diaryVal) as Record<string, unknown>;
-        Object.values(diaryObj).forEach((logsArr) => {
-          if (Array.isArray(logsArr)) {
-            logs += logsArr.length;
-          }
-        });
+        const diaryObj = JSON.parse(diaryVal);
+        if (diaryObj && typeof diaryObj === 'object' && !Array.isArray(diaryObj)) {
+          Object.values(diaryObj).forEach((logsArr) => {
+            if (Array.isArray(logsArr)) {
+              logs += logsArr.length;
+            }
+          });
+        }
       }
     } catch {
       // ignore
@@ -179,7 +183,10 @@ export default function App() {
       try {
         const item = localStorage.getItem('daedong_visited');
         if (item) {
-          visited = JSON.parse(item);
+          const parsed = JSON.parse(item);
+          if (Array.isArray(parsed)) {
+            visited = parsed;
+          }
         }
       } catch (e) {
         console.error('Failed to parse daedong_visited:', e);

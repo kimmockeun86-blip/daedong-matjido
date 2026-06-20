@@ -119,7 +119,12 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
     let favs: string[] = [];
     try {
       const item = localStorage.getItem('daedong_favorites');
-      if (item) favs = JSON.parse(item);
+      if (item) {
+        const parsed = JSON.parse(item);
+        if (Array.isArray(parsed)) {
+          favs = parsed;
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -139,7 +144,12 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
     let allLogs: Record<string, { date: string; note: string }[]> = {};
     try {
       const item = localStorage.getItem('daedong_diary');
-      if (item) allLogs = JSON.parse(item);
+      if (item) {
+        const parsed = JSON.parse(item);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          allLogs = parsed;
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -166,7 +176,12 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
     let favs: string[] = [];
     try {
       const item = localStorage.getItem('daedong_favorites');
-      if (item) favs = JSON.parse(item);
+      if (item) {
+        const parsed = JSON.parse(item);
+        if (Array.isArray(parsed)) {
+          favs = parsed;
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -208,7 +223,12 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
     let allLogs: Record<string, Array<{ date: string; note: string }>> = {};
     try {
       const item = localStorage.getItem('daedong_diary');
-      if (item) allLogs = JSON.parse(item);
+      if (item) {
+        const parsed = JSON.parse(item);
+        if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+          allLogs = parsed;
+        }
+      }
     } catch (e) {
       console.error(e);
     }
@@ -233,7 +253,12 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
     let visited: string[] = [];
     try {
       const item = localStorage.getItem('daedong_visited');
-      if (item) visited = JSON.parse(item);
+      if (item) {
+        const parsed = JSON.parse(item);
+        if (Array.isArray(parsed)) {
+          visited = parsed;
+        }
+      }
     } catch (e) {
       console.error(e);
     }

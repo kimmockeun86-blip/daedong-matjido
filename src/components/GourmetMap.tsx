@@ -47,6 +47,16 @@ export default function GourmetMap({
   const [mapSkin, setMapSkin] = useState<'cyberpunk' | 'smooth' | 'light'>('cyberpunk');
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const polylineRef = useRef<L.Polyline | null>(null);
+  const skinSwitcherRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    const switcher = skinSwitcherRef.current;
+    if (switcher) {
+      L.DomEvent.disableClickPropagation(switcher);
+      L.DomEvent.disableScrollPropagation(switcher);
+    }
+  }, []);
+
   // 1. 지도 초기화 (최초 1회 실행)
   useEffect(() => {
     if (!mapContainerRef.current || mapRef.current) return;
@@ -344,6 +354,7 @@ export default function GourmetMap({
       />
       {/* Map Skin Switcher */}
       <div 
+        ref={skinSwitcherRef}
         onClick={(e) => e.stopPropagation()}
         onMouseDown={(e) => e.stopPropagation()}
         onTouchStart={(e) => e.stopPropagation()}

@@ -443,8 +443,9 @@ export default function GourmetToolkit({
   }, [activeTab, restaurants, swipePool.length, isUnlocked, top10Ids, matchParams.senderLikes]);
 
   const handleSwipeFinish = (likes: string[] = swipeLikes) => {
+    const realLikes = likes.filter(id => id !== 'sponsored_voucher_makgeolli');
     const categoriesCount: Record<string, number> = {};
-    likes.forEach(id => {
+    realLikes.forEach(id => {
       const r = restaurants.find(item => item.id === id);
       if (r) {
         categoriesCount[r.category] = (categoriesCount[r.category] || 0) + 1;
@@ -464,7 +465,7 @@ export default function GourmetToolkit({
     let desc = '한식, 일식, 양식 가리지 않고 도전하는 만능 식객입니다. 편식하지 않고 새로운 맛집을 찾아 모험을 떠나는 데 특화되어 있습니다.';
     let tag = '#올라운더 #맛의잡식가 #도전정신';
 
-    if (likes.length === 0) {
+    if (realLikes.length === 0) {
       title = 'LITE: 청정 소식주의자';
       desc = '음식을 가볍게 즐기고 소량으로 깔끔하게 먹는 것을 즐깁니다. 분위기 좋은 카페나 정갈한 한 그릇 요리를 선호합니다.';
       tag = '#소식가 #정갈함 #깔끔한한그릇';
