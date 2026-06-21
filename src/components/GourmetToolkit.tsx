@@ -473,8 +473,10 @@ export default function GourmetToolkit({
     setSwipeCompleted(true);
 
     if (matchParams.senderLikes.length > 0) {
-      const common = restaurants.filter(r => likes.includes(r.id || '') && matchParams.senderLikes.includes(r.id || ''));
-      const rate = Math.round((common.length / Math.max(1, likes.length)) * 100);
+      const realLikes = likes.filter(id => id !== 'sponsored_voucher_makgeolli');
+      const senderRealLikes = matchParams.senderLikes.filter(id => id !== 'sponsored_voucher_makgeolli');
+      const common = restaurants.filter(r => realLikes.includes(r.id || '') && senderRealLikes.includes(r.id || ''));
+      const rate = Math.round((common.length / Math.max(1, realLikes.length)) * 100);
       setMatchedResults({
         commonLikes: common,
         syncRate: rate
@@ -482,17 +484,6 @@ export default function GourmetToolkit({
     }
   };
 
-  const handleDragStart = (clientX: number, clientY: number) => {
-    setIsDragging(true);
-    dragStartRef.current = { x: clientX, y: clientY };
-  };
-
-  const handleDragMove = (clientX: number, clientY: number) => {
-    if (!isDragging) return;
-    const deltaX = clientX - dragStartRef.current.x;
-    const deltaY = clientY - dragStartRef.current.y;
-    setDragOffset({ x: deltaX, y: deltaY });
-  };
 
   const handleDragEnd = () => {
     if (!isDragging) return;
@@ -1303,13 +1294,33 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                         </div>
                         
                         <div 
-                          onMouseDown={(e) => handleDragStart(e.clientX, e.clientY)}
-                          onMouseMove={(e) => handleDragMove(e.clientX, e.clientY)}
-                          onMouseUp={handleDragEnd}
-                          onMouseLeave={handleDragEnd}
-                          onTouchStart={(e) => handleDragStart(e.touches[0].clientX, e.touches[0].clientY)}
-                          onTouchMove={(e) => handleDragMove(e.touches[0].clientX, e.touches[0].clientY)}
-                          onTouchEnd={handleDragEnd}
+                          onPointerDown={(e) => {
+                            e.currentTarget.setPointerCapture(e.pointerId);
+                            setIsDragging(true);
+                            dragStartRef.current = { x: e.clientX, y: e.clientY };
+                          }}
+                          onPointerMove={(e) => {
+                            if (!isDragging) return;
+                            const deltaX = e.clientX - dragStartRef.current.x;
+                            const deltaY = e.clientY - dragStartRef.current.y;
+                            setDragOffset({ x: deltaX, y: deltaY });
+                          }}
+                          onPointerUp={(e) => {
+                            try {
+                              e.currentTarget.releasePointerCapture(e.pointerId);
+                            } catch {
+                              // ignore
+                            }
+                            handleDragEnd();
+                          }}
+                          onPointerCancel={(e) => {
+                            try {
+                              e.currentTarget.releasePointerCapture(e.pointerId);
+                            } catch {
+                              // ignore
+                            }
+                            handleDragEnd();
+                          }}
                           style={{
                             width: '100%',
                             height: '220px',

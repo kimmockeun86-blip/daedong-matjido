@@ -1833,5 +1833,40 @@ Cycle 22 (요청된 Cycle 11 단계) 정밀 검토 결과, **코드베이스 내
   - **데이터 보안 및 비즈니스 로직**: 미해금 Top 10 노포 식당에 대한 상세 정보 조회가 비즈니스 가드 조건(단톡방 공유 3회 또는 미식 일기 2회 작성)에 따라 엄격히 검증/차단되고 있으며, 로컬스토리지 JSON 파싱 오류 시에도 적절한 try-catch 구문으로 앱 런타임 크래시를 예방하고 있습니다.
   - **종합 결론**: Cycle 75 코드베이스 정밀 스캔 결과, 추가적인 기술 결함, 에지 케이스 버그, UI/UX 결함, 혹은 정적 분석상 경고 사항이 탐지되지 않은 무결점(Zero Bug)의 청정 상태가 지속적으로 완벽히 유지되고 있습니다.
 
+---
+
+## Cycle 76. 종합 검증 및 코드베이스 정밀 스캔 리포트 (Cycle 76 Quality Assurance & Codebase Integrity Scan)
+
+* **검토 일시**: 2026-06-21
+* **TypeScript 컴파일 검증**: 성공 (0 Errors, 0 Warnings)
+* **ESLint 정적 분석 검증**: 성공 (0 Errors, 0 Warnings)
+
+### 발견된 신규 에지 케이스 및 사양 규격 오류 (New Issues & Specification Gaps)
+
+1. **MBTI 매칭 싱글 레이트 계산 시 비-식당 스폰서 쿠폰 카드가 분모에 포함되는 정합성 오류 (MBTI Match Sync Rate Calculation Defect)**
+   * **위치**: `src/components/GourmetToolkit.tsx` (Line 475-483)
+   * **설명**:
+     - Tinder 스타일 MBTI 스와이프 결과 매칭율(`syncRate`) 계산 시, 사용자가 스폰서 쿠폰 카드(`sponsored_voucher_makgeolli`)를 LIKE 한 경우 `likes` 배열에 해당 ID가 추가됩니다.
+     - 그러나 스폰서 쿠폰 카드는 일반 식당 데이터인 `restaurants` 풀에 등록되어 있지 않으므로 `common` (양쪽 모두 좋아한 식당 목록) 필터링 결과에는 절대 포함되지 않습니다.
+     - 결과적으로 분모(`likes.length`)에는 쿠폰이 포함되어 1 늘어나지만 분자(`common.length`)에는 포함되지 않아, 실제 식당 매칭률이 100% 임에도 67% 등으로 과소 계산되는 정합성 오류가 발생합니다.
+   * **해결 방안**: `likes` 배열에서 `sponsored_voucher_makgeolli`를 제외한 `realLikes` 배열의 길이를 분모로 설정하여 연산해야 합니다.
+
+2. **스와이프 제스처 카드 조작 시 drag pointer bounds 이탈에 따른 오작동 우려 (Tinder-style Swipe Event Capture Glitch)**
+   * **위치**: `src/components/GourmetToolkit.tsx` (Line 1306-1312)
+   * **설명**:
+     - Tinder 스타일 카드 스와이프 조작 시 `onMouseMove`, `onMouseUp`, `onMouseLeave` 등의 마우스 이벤트가 카드 엘리먼트 자체(`div`)에만 바인딩되어 있습니다.
+     - 이로 인해 사용자가 마우스를 다소 빠르게 움직여 포인터가 카드 영역 바깥으로 이탈하는 경우, 이벤트가 유실되거나 버벅거리며 드래그가 도중에 풀려버리는 불량한 사용성이 제공됩니다.
+     - 또한 모바일에서 예기치 않게 터치 이벤트가 취소되는 경우(`onTouchCancel`)에 대한 대응도 누락되어 드래그 상태(`isDragging`)가 원치 않게 활성 상태로 고정되는 에지 케이스가 존재합니다.
+   * **해결 방안**: Pointer capture API (`setPointerCapture`)를 적용하거나 window/document 단위에서 move/up 이벤트를 수신하도록 개선하고, `onTouchCancel` 핸들러에 `handleDragEnd`를 지정해 주어야 합니다.
+
+3. **중간 지점 검색기(Station/Region Search) 입력 필드 누락 검증 부재 및 UI 예외 (Station search validation loophole)**
+   * **위치**: `src/components/Sidebar.tsx` (Line 296-302)
+   * **설명**:
+     - 중간 지점 탐색(`handleStationSearch`) 시 공백을 제외한 입력값 존재 여부만 검사(`station1.trim() && station2.trim()`)하고 있으며, 동일한 두 지점을 입력(예: "서울", "서울")했을 때의 예외 처리가 부재합니다.
+     - 동일한 지점을 입력하면 두 출발지의 평균 좌표가 완전히 같아져 1:1 정중앙 지점 계산의 실효성이 없으며, 지도 뷰포트가 무의미하게 재이동하고 매칭 알림이 노출됩니다.
+   * **해결 방안**: 두 입력값이 완전히 동일할 경우 경고 모달을 띄우거나, "서로 다른 두 지점을 입력해 주세요." 형태의 예외 처리를 추가해야 합니다.
+
+* **종합 결론**: Cycle 76 코드베이스 정밀 스캔 결과, 빌드 및 린트는 완벽히 수행되지만, Tinder 스와이프 매칭 시 스폰서 쿠폰 유무에 따른 정합성 왜곡 에지 케이스 및 제스처 조작감 한계, 그리고 중간 지점 탐색 시 동일값 인풋 예외 처리에 대한 아키텍처적 보강 필요성이 식별되었습니다.
+
 
 

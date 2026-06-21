@@ -301,6 +301,11 @@ export default function Sidebar({
     const term1 = station1.trim().toLowerCase();
     const term2 = station2.trim().toLowerCase();
 
+    if (term1 === term2) {
+      alert('서로 다른 두 지점을 입력해 주세요!');
+      return;
+    }
+
     const matches1 = restaurants.filter(r => r.address.toLowerCase().includes(term1));
     const matches2 = restaurants.filter(r => r.address.toLowerCase().includes(term2));
 
