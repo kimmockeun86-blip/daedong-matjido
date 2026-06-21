@@ -2,40 +2,7 @@ import { useState, useRef, useMemo, useEffect } from 'react';
 import { X, Gift, Share2, HelpCircle, RotateCcw, Camera, Heart, Trophy, MapPin, Award } from 'lucide-react';
 import type { RestaurantRaw } from '../utils/excel';
 import L from 'leaflet';
-
-const safeCopyToClipboard = (text: string): Promise<void> => {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    return navigator.clipboard.writeText(text);
-  }
-  return new Promise<void>((resolve, reject) => {
-    try {
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      textArea.style.position = 'fixed';
-      textArea.style.top = '0';
-      textArea.style.left = '0';
-      textArea.style.width = '2em';
-      textArea.style.height = '2em';
-      textArea.style.padding = '0';
-      textArea.style.border = 'none';
-      textArea.style.outline = 'none';
-      textArea.style.boxShadow = 'none';
-      textArea.style.background = 'transparent';
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      const successful = document.execCommand('copy');
-      document.body.removeChild(textArea);
-      if (successful) {
-        resolve();
-      } else {
-        reject(new Error('Fallback copy failed'));
-      }
-    } catch (err) {
-      reject(err);
-    }
-  });
-};
+import { safeCopyToClipboard } from '../utils/clipboard';
 
 const getShareOrigin = (): string => {
   const origin = window.location.origin;

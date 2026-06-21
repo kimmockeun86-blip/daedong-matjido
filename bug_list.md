@@ -1737,3 +1737,47 @@ Cycle 22 (요청된 Cycle 11 단계) 정밀 검토 결과, **코드베이스 내
     - **데이터 보안 및 비즈니스 가드**: GPS 위치 추적, 다중 코스 딥링크 수신, 퀴즈 정복, 흔들기(Shake) 셔플 추천 시 전국 Top 10 노포 식당에 대한 미해금 상태 검증이 일관되게 대조/차단되어 미해금 상태에서 식당 상세 정보가 유출되거나 우회 인입되는 보안/기능상 결함이 존재하지 않습니다.
   - **종합 결론**: Cycle 72 코드베이스 정밀 스캔 결과, 추가적인 기술 결함, 에지 케이스 버그, UI/UX 결함, 혹은 정적 분석상 경고 사항이 탐지되지 않은 무결점(Zero Bug)의 청정 상태가 지속적으로 완벽히 유지되고 있습니다.
 
+---
+
+## Cycle 73. 종합 검증 및 코드베이스 정밀 스캔 리포트 (Cycle 73 Quality Assurance & Codebase Integrity Scan)
+
+* **검토 일시**: 2026-06-21
+* **TypeScript 컴파일 검증**: 성공 (0 Errors, 0 Warnings)
+* **ESLint 정적 분석 검증**: 성공 (0 Errors, 0 Warnings)
+
+### 발견된 신규 에지 케이스 및 사양 규격 오류 (New Issues & Specification Gaps)
+
+1. **모바일 Capacitor 하이브리드 앱 환경에서 샘플 엑셀 다운로드 실패 (Capacitor File Download Failure)**
+   * **위치**: `src/components/ExcelImporter.tsx` (Line 237), `src/utils/excel.ts` (Line 62)
+   * **설명**: 
+     - 모바일 웹뷰(Capacitor iOS/Android) 내에서 "샘플 받기" 클릭 시 실행되는 `XLSX.writeFile()`은 브라우저 다운로드 기능을 호출하므로 모바일 앱 환경에서는 작동하지 않거나 무반응 오류가 발생합니다.
+     - `GourmetToolkit` 내의 인증 이미지 다운로드 방식처럼 Capacitor 플랫폼 환경을 감지하여 브라우저 외부 링크로 열거나 공유 모달창을 제공해야 합니다.
+   * **해결 방안**: `isCapacitor` 유무를 판별하여, 앱 환경일 경우 시스템 기본 웹 브라우저를 통해 샘플 파일 다운로드 주소로 이동시키거나 파일 공유 기능을 제공합니다.
+
+2. **클립보드 복사 유틸리티 함수 중복 정의로 인한 코드 관리 비효율 (Duplicate safeCopyToClipboard Utility)**
+   * **위치**: `src/components/Sidebar.tsx` (Line 7), `src/components/DetailPanel.tsx` (Line 8), `src/components/GourmetToolkit.tsx` (Line 6)
+   * **설명**: 
+     - 세 개의 개별 컴포넌트 파일에 동일한 `safeCopyToClipboard` 복사 로직이 개별 정의되어 중복 코드가 발생하고 코드 수정 시 유지보수 정합성을 저해합니다.
+   * **해결 방안**: 복사 로직을 `src/utils/clipboard.ts` 와 같은 공통 유틸 폴더로 분리하여 통합 임포트해 사용하도록 개선해야 합니다.
+
+3. **필터링/정렬 등으로 가변하는 맛집 카드 목록에서 배열 index를 key로 활용하는 React 결함 (React key Optimization Gap)**
+   * **위치**: `src/components/Sidebar.tsx` (Line 1171)
+   * **설명**: 
+     - 카테고리 필터나 검색 쿼리에 따라 동적으로 항목 수가 변하고 `isSelected` 등의 스타일 변화가 있는 `filteredRestaurants` 목록 렌더링 시 고유 식별자 대신 배열의 `idx`를 key로 사용하고 있어, 가상 DOM 재사용 과정에서 UI 오작동이나 썸네일 불일치 등의 렌더링 부작용이 유발될 수 있습니다.
+   * **해결 방안**: `ensureRestaurantIds`를 통해 모든 데이터에 할당된 유니크 ID인 `res.id`를 컴포넌트 `key={res.id}`로 지정해야 합니다.
+
+4. **Canvas 텍스트 렌더링 시 커스텀 폰트 로드 완료 시점 불일치 결함 (Canvas Text Font Loading Race Condition)**
+   * **위치**: `src/components/GourmetToolkit.tsx` (Line 247, 790)
+   * **설명**: 
+     - 인증서 이미지 카드 내보내기를 위해 Canvas 상에 `bold 12px "Noto Sans KR"` 폰트를 사용해 텍스트를 렌더링하지만, 폰트 파일이 완전히 다운로드되어 로드되지 않은 시점에 사용자가 다운로드를 누르면 브라우저 기본 글꼴(sans-serif)로 그려지는 버그가 있습니다.
+   * **해결 방안**: 캔버스 렌더링 시점에 `document.fonts.ready` 비동기 프로미스를 확인하고 처리를 진행하도록 방어 로직을 보강해야 합니다.
+
+5. **FileReader 내 deprecated API (readAsBinaryString) 호출 결함 (Deprecated API Usage)**
+   * **위치**: `src/utils/excel.ts` (Line 202)
+   * **설명**: 
+     - 엑셀 파일을 가져오기 위해 `FileReader.readAsBinaryString(file)`을 사용하고 있습니다. 해당 API는 W3C File API 스펙에서 지원 중단(deprecated)되었으며 모바일 웹뷰 및 신규 브라우저 환경에서 장기적인 안정성을 훼손할 수 있습니다.
+   * **해결 방안**: modern 표준인 `readAsArrayBuffer(file)`로 교체하고 `XLSX.read(data, {type: 'array'})` 구조로 읽어내도록 전환해야 합니다.
+
+* **종합 결론**: Cycle 73 코드베이스 정밀 스캔 결과, TypeScript/ESLint 상의 에러는 탐지되지 않았으나 모바일 웹뷰 다운로드 한계 대응 및 리액트 렌더링 키 튜닝, W3C 표준 규격 위반 사항이 발견되어 추가적인 정밀 최적화 필요성이 제기됩니다.
+
+

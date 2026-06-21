@@ -78,6 +78,31 @@ export function downloadSampleExcel() {
   // 3. 워크북에 시트 추가
   XLSX.utils.book_append_sheet(wb, ws, '맛집목록');
 
+  const isCapacitor = (window as unknown as { Capacitor?: unknown }).Capacitor !== undefined;
+  const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
+  if (isCapacitor || isMobile) {
+    try {
+      const wbout = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+      const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const file = new File([blob], '대동여맛집지도_샘플.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+      if (navigator.canShare && navigator.canShare({ files: [file] })) {
+        navigator.share({
+          files: [file],
+          title: '대동여맛집지도 샘플 엑셀',
+          text: '대동여맛집지도 업로드용 샘플 엑셀 파일입니다.'
+        }).catch(err => {
+          console.error('Share failed, fallback to download:', err);
+          XLSX.writeFile(wb, '대동여맛집지도_샘플.xlsx');
+        });
+        return;
+      }
+    } catch (shareErr) {
+      console.error('Failed to prepare share, fallback to download:', shareErr);
+    }
+  }
+
   // 4. 바이너리 스트링 작성 및 다운로드 트리거
   XLSX.writeFile(wb, '대동여맛집지도_샘플.xlsx');
 }
@@ -127,7 +152,7 @@ export function parseExcelFile(file: File): Promise<RestaurantRaw[]> {
           throw new Error('파일 데이터를 읽을 수 없습니다.');
         }
 
-        const workbook = XLSX.read(data, { type: 'binary' });
+        const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
 
@@ -199,6 +224,6 @@ export function parseExcelFile(file: File): Promise<RestaurantRaw[]> {
     };
 
     reader.onerror = (err) => reject(err);
-    reader.readAsBinaryString(file);
+    reader.readAsArrayBuffer(file);
   });
 }

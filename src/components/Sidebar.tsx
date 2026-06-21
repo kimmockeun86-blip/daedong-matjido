@@ -3,40 +3,7 @@ import { Search, MapPin, Compass, Navigation, BarChart3, X } from 'lucide-react'
 import type { RestaurantRaw } from '../utils/excel';
 import L from 'leaflet';
 import { CATEGORY_IMAGES } from '../constants/images';
-
-const safeCopyToClipboard = (text: string): Promise<void> => {
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    return navigator.clipboard.writeText(text);
-  }
-  return new Promise<void>((resolve, reject) => {
-    try {
-      const textArea = document.createElement('textarea');
-      textArea.value = text;
-      textArea.style.position = 'fixed';
-      textArea.style.top = '0';
-      textArea.style.left = '0';
-      textArea.style.width = '2em';
-      textArea.style.height = '2em';
-      textArea.style.padding = '0';
-      textArea.style.border = 'none';
-      textArea.style.outline = 'none';
-      textArea.style.boxShadow = 'none';
-      textArea.style.background = 'transparent';
-      document.body.appendChild(textArea);
-      textArea.focus();
-      textArea.select();
-      const successful = document.execCommand('copy');
-      document.body.removeChild(textArea);
-      if (successful) {
-        resolve();
-      } else {
-        reject(new Error('Fallback copy failed'));
-      }
-    } catch (err) {
-      reject(err);
-    }
-  });
-};
+import { safeCopyToClipboard } from '../utils/clipboard';
 
 const getShareOrigin = (): string => {
   const origin = window.location.origin;
@@ -1141,7 +1108,7 @@ export default function Sidebar({
               </div>
             ) : (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', position: 'relative' }}>
-                {filteredRestaurants.map((res, idx) => {
+                {filteredRestaurants.map((res) => {
                   const isLockedItem = false;
                   const isSelected = selectedRestaurant?.id === res.id;
                   const isSponsored = res.name === '경상도집' || res.name === '굴다리식당';
@@ -1168,7 +1135,7 @@ export default function Sidebar({
 
                   return (
                     <div
-                      key={idx}
+                      key={res.id}
                       onClick={() => {
                         if (isLockedItem) {
                           setShowUnlockModal(true);
