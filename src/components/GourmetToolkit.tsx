@@ -2430,7 +2430,7 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                 >
                   <option value="">-- 추가할 노포 맛집 선택 --</option>
                   {restaurants
-                    .filter(r => (isUnlocked || !top10Ids.includes(r.id || '')) && r.latitude !== undefined && r.longitude !== undefined)
+                    .filter(r => (isUnlocked || !top10Ids.includes(r.id || '')) && r.latitude !== undefined && r.longitude !== undefined && !routeRestaurants.some(rr => rr.id === r.id))
                     .map(r => (
                       <option key={r.id} value={r.id}>
                         [{r.category}] {r.name} - {r.address}
