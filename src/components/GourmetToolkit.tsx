@@ -368,9 +368,12 @@ export default function GourmetToolkit({
 
   useEffect(() => {
     if (activeTab === 'mbti' && swipePool.length === 0 && restaurants.length > 0) {
-      const candidates = isUnlocked
+      let candidates = isUnlocked
         ? restaurants
         : restaurants.filter(r => !top10Ids.includes(r.id || ''));
+      if (candidates.length === 0) {
+        candidates = restaurants;
+      }
 
       const pool: RestaurantRaw[] = [];
 
@@ -631,6 +634,12 @@ export default function GourmetToolkit({
 
     let pool = baseRestaurants.filter(r => r.category === partner1Pref || r.category === partner2Pref);
     if (pool.length === 0) pool = baseRestaurants;
+    if (pool.length === 0) pool = restaurants;
+
+    if (pool.length === 0) {
+      alert('등록된 맛집 데이터가 없습니다!');
+      return;
+    }
 
     const recommendedRestaurant = pool[hash % pool.length];
 
