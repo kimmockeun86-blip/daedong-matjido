@@ -169,10 +169,14 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
 
   // 더치페이 정산 계산기
   const calculateDutch = () => {
-    const total = parseFloat(totalAmount);
-    const people = parseInt(numPeople);
-    if (isNaN(total) || isNaN(people) || people <= 0) {
-      alert('정확한 정산 금액과 인원수를 입력해 주세요!');
+    if (!/^\d+$/.test(totalAmount) || !/^\d+$/.test(numPeople)) {
+      alert('올바른 정산 금액과 인원수(양의 정수)를 입력해 주세요!');
+      return;
+    }
+    const total = parseInt(totalAmount, 10);
+    const people = parseInt(numPeople, 10);
+    if (total <= 0 || people <= 0) {
+      alert('정산 금액과 인원수는 0보다 커야 합니다!');
       return;
     }
     setDutchResult(Math.round(total / people));

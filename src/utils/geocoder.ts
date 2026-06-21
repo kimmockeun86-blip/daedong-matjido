@@ -38,7 +38,11 @@ export async function geocodeAddress(address: string): Promise<Coordinates | nul
 
   // 1. 캐시 히트 체크
   if (cache[cleanAddress]) {
-    return cache[cleanAddress];
+    const cached = cache[cleanAddress];
+    if (cached.latitude === 0 && cached.longitude === 0) {
+      return null;
+    }
+    return cached;
   }
 
   // 2. OpenStreetMap Nominatim API 호출
@@ -64,6 +68,9 @@ export async function geocodeAddress(address: string): Promise<Coordinates | nul
       // 결과 캐시 저장
       setCache(cleanAddress, coords);
       return coords;
+    } else {
+      // 결과 없음 캐시 저장
+      setCache(cleanAddress, { latitude: 0, longitude: 0 });
     }
   } catch (err) {
     console.error(`지오코딩 실패 (${cleanAddress}):`, err);

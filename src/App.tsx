@@ -919,23 +919,25 @@ export default function App() {
           </button>
 
           {/* 미식 툴킷 모달 */}
-          <GourmetToolkit
-            isOpen={isToolkitOpen}
-            onClose={() => setIsToolkitOpen(false)}
-            restaurants={restaurants}
-            onSelectRestaurant={(rest) => {
-              handleSelectRestaurant(rest);
-              if (rest.latitude && rest.longitude && mapRef.current) {
-                mapRef.current.setView([rest.latitude, rest.longitude], 15, { animate: true, duration: 1.0 });
-              }
-            }}
-            visitedRestaurants={visitedRestaurants}
-            isMobile={isMobile}
-            routeRestaurants={routeRestaurants}
-            setRouteRestaurants={setRouteRestaurants}
-            isUnlocked={unlockProgress.isUnlocked}
-            defaultTab={toolkitTab}
-          />
+          {isToolkitOpen && (
+            <GourmetToolkit
+              isOpen={isToolkitOpen}
+              onClose={() => setIsToolkitOpen(false)}
+              restaurants={restaurants}
+              onSelectRestaurant={(rest) => {
+                handleSelectRestaurant(rest);
+                if (rest.latitude && rest.longitude && mapRef.current) {
+                  mapRef.current.setView([rest.latitude, rest.longitude], 15, { animate: true, duration: 1.0 });
+                }
+              }}
+              visitedRestaurants={visitedRestaurants}
+              isMobile={isMobile}
+              routeRestaurants={routeRestaurants}
+              setRouteRestaurants={setRouteRestaurants}
+              isUnlocked={unlockProgress.isUnlocked}
+              defaultTab={toolkitTab}
+            />
+          )}
 
           {/* 웰컴 및 PWA 홈화면 앱 설치 가이드 온보딩 모달 */}
           {showWelcomeModal && (

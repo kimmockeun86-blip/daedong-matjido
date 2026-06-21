@@ -175,12 +175,12 @@ export function parseExcelFile(file: File): Promise<RestaurantRaw[]> {
           const region = row['지역'] || row['region'] || (addressStr ? addressStr.split(' ')[0] : '');
           const city = row['도시명'] || row['city'] || (addressStr ? addressStr.split(' ')[1] : '');
 
-          const rawRating = row['평점'] !== undefined && row['평점'] !== null ? row['평점'] : row['rating'];
-          let rating = 4.5;
-          if (rawRating !== undefined && rawRating !== null && String(rawRating).trim() !== '') {
+          let rating = 0;
+          const rawRating = row['평점'] || row['rating'];
+          if (rawRating !== undefined && rawRating !== null && rawRating !== '') {
             const parsed = parseFloat(String(rawRating));
             if (!isNaN(parsed)) {
-              rating = parsed;
+              rating = Math.max(0, Math.min(5, parsed));
             }
           }
 

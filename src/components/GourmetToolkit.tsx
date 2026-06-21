@@ -1080,8 +1080,32 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                     </button>
                   </div>
                 ) : (
-                  <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
-                    [ 돌리기 ] 버튼을 클릭해 주세요!
+                  <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '8px' }}>
+                    {rouletteList.length > 0 ? (
+                      <>
+                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'center', maxWidth: '260px' }}>
+                          {rouletteList.map((r, idx) => (
+                            <span key={idx} style={{
+                              fontSize: '10px',
+                              background: 'rgba(255, 255, 255, 0.08)',
+                              border: '1px solid var(--border-glass)',
+                              padding: '2px 6px',
+                              borderRadius: '4px',
+                              color: 'var(--accent-cyan)'
+                            }}>
+                              {r.name}
+                            </span>
+                          ))}
+                        </div>
+                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>
+                          후보 선정 완료! [ 돌리기 ]를 눌러주세요.
+                        </div>
+                      </>
+                    ) : (
+                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                        [ 돌리기 ] 버튼을 클릭해 주세요!
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
