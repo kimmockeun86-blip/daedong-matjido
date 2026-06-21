@@ -211,7 +211,10 @@ export default function GourmetToolkit({
   };
 
   // 5.2 미식 역사 연대기 캔버스 카드 다운로드
-  const downloadWrappedCard = () => {
+  const downloadWrappedCard = async () => {
+    if (document.fonts) {
+      await document.fonts.ready;
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -754,7 +757,10 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
   };
 
   // 5.1 인스타그램 인증 캔버스 카드 다운로드
-  const downloadInstagramCard = () => {
+  const downloadInstagramCard = async () => {
+    if (document.fonts) {
+      await document.fonts.ready;
+    }
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
