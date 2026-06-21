@@ -77,6 +77,16 @@ export default function Sidebar({
   // Shake Match State & Refs
   const [shakeResultRestaurant, setShakeResultRestaurant] = useState<RestaurantRaw | null>(null);
   const isShufflingRef = useRef(false);
+  const shakeIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const reportTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (shakeIntervalRef.current) clearInterval(shakeIntervalRef.current);
+      if (reportTimeoutRef.current) clearTimeout(reportTimeoutRef.current);
+    };
+  }, []);
 
   // 고유 카테고리 추출
 
@@ -134,7 +144,8 @@ export default function Sidebar({
     isShufflingRef.current = true;
     
     let count = 0;
-    const interval = setInterval(() => {
+    if (shakeIntervalRef.current) clearInterval(shakeIntervalRef.current);
+    shakeIntervalRef.current = setInterval(() => {
       // Pick random filters for machine slot animation effect
       const randCat = categories[Math.floor(Math.random() * categories.length)];
       const randReg = regionsSorted.length > 0 
@@ -145,7 +156,10 @@ export default function Sidebar({
       count++;
       
       if (count > 8) {
-        clearInterval(interval);
+        if (shakeIntervalRef.current) {
+          clearInterval(shakeIntervalRef.current);
+          shakeIntervalRef.current = null;
+        }
         
         // Final Selection: pick a random restaurant from the main list (excluding locked Top 10)
         if (restaurants.length > 0) {
@@ -283,13 +297,15 @@ export default function Sidebar({
       return;
     }
     setReportSuccess(true);
-    setTimeout(() => {
+    if (reportTimeoutRef.current) clearTimeout(reportTimeoutRef.current);
+    reportTimeoutRef.current = setTimeout(() => {
       setReportSuccess(false);
       setShowReportModal(false);
       setReportName('');
       setReportAddress('');
       setReportMenu('');
       setReportReason('');
+      reportTimeoutRef.current = null;
     }, 2200);
   };
 

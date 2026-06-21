@@ -2012,3 +2012,34 @@ Cycle 82 정밀 검토 및 교차 검증 결과, TypeScript 컴파일 경고 및
 ### 종합 결론
 Cycle 83 정밀 검토 및 교차 검증 결과, TypeScript 컴파일 경고 및 ESLint 오류는 일절 존재하지 않는 청정 무결성 상태(Zero Warning, Zero Compile Error)를 계속해서 유지하고 있습니다. 앱 구동이나 예외 처리 부문에서 에지 케이스 크래시나 기능 홀이 검출되지 않는 완벽한 코드베이스 품질이 입증되었습니다.
 
+---
+
+## Cycle 84. 종합 검증 및 코드베이스 정밀 스캔 리포트 (Cycle 84 Quality Assurance & Codebase Integrity Scan)
+
+* **검토 일시**: 2026-06-22
+* **TypeScript 컴파일 검증**: 성공 (0 Errors, 0 Warnings)
+* **ESLint 정적 분석 검증**: 성공 (0 Errors, 0 Warnings)
+
+### 발견된 신규 에지 케이스 및 사양 규격 오류 (New Issues & Specification Gaps)
+
+1. **Leaflet Popup HTML Injection & XSS Vulnerability (HTML 인젝션 및 보안 취약점)**
+   * **위치**: `src/components/GourmetMap.tsx` (Line 269)
+   * **설명**: Leaflet 마커의 팝업 내용(`popupContent`)을 생성할 때, 엑셀 파일로부터 읽어온 식당명(`res.name`)과 주소(`res.address`), 카테고리(`res.category`) 등의 문자열 데이터를 별도의 이스케이프(Escape) 처리 없이 HTML 템플릿 리터럴에 직접 보간하여 `marker.bindPopup()`에 주입하고 있습니다. 만약 악성 스크립트나 특수 기호가 포함된 엑셀 파일이 업로드되는 경우 크로스 사이트 스크립팅(XSS) 취약점으로 이어지거나 마커 팝업 레이아웃이 깨지는 오작동이 유발됩니다.
+   * **해결 방안**: 팝업 문자열을 보간하기 전에 문자열 내의 HTML 특수 문자(`<`, `>`, `&`, `"`, `'`)를 안전하게 치환하는 `escapeHtml` 헬퍼 함수를 추가하고, 데이터 출력부를 해당 함수로 감싸서 안전하게 인코딩해야 합니다.
+
+2. **컴포넌트 언마운트 시 비동기 타이머(setInterval/setTimeout) 클린업 누락 (Memory Leak & Unmounted State Update)**
+   * **위치**: `src/components/Sidebar.tsx` (Line 137, 286), `src/components/DetailPanel.tsx` (Line 312, 328)
+   * **설명**: 
+     - `Sidebar.tsx`의 셔플 추천 애니메이션(`triggerShake` 내 `setInterval`) 및 제보 성공 후 모달 닫기 딜레이(`setTimeout`)가 실행되는 도중 컴포넌트가 언마운트되거나 닫히면 타이머가 메모리에 계속 상주하며 언마운트된 컴포넌트의 상태를 변경하려고 시도합니다.
+     - `DetailPanel.tsx`의 클립보드 복사 표시 타이머와 택시 호출 연동 상태 복원 타이머 역시 마찬가지로 상세 패널이 다른 식당의 클릭으로 인해 재생성되거나 수동으로 닫혀 언마운트될 때 적절히 해제되지 않아 경고와 메모리 누수를 유발할 수 있습니다.
+   * **해결 방안**: 컴포넌트 언마운트 시점에 모든 동작 중인 비동기 타이머들을 해제할 수 있도록 `useEffect` 클린업 함수를 연동하거나, 타이머 ID를 `useRef`로 관리하여 unmount 시점에 `clearInterval` / `clearTimeout`을 명시적으로 실행해 주어야 합니다.
+
+3. **필터링되지 않는 사장된 평점 필터 상태 관리 (Dead State Variable)**
+   * **위치**: `src/App.tsx` (Line 245, 545, 559, 629, 644, 793, 808)
+   * **설명**: `App.tsx` 내에 맛집 최소 평점 필터링을 위한 `minRating` 상태 변수가 선언되어 있고 `filteredRestaurants` 계산식에도 반영되어 있지만, 실제 UI 및 사이드바(`Sidebar.tsx`) 컴포넌트에는 평점 필터 조작 요소가 전혀 제공되지 않아 항상 `0`으로만 고정되어 동작하는 불필요한 데드 스토어(Dead State Store) 상태입니다.
+   * **해결 방안**: 평점 필터 기능을 활용하기 위해 사이드바에 평점 필터 슬라이더/드롭다운을 추가하거나, 불필요한 연산 및 복잡성을 줄이기 위해 해당 `minRating` 관련 상태 변수와 필터링 코드를 완전히 정리해야 합니다.
+
+### 종합 결론
+Cycle 84 정밀 검토 및 교차 검증 결과, TypeScript 컴파일 경고 및 ESLint 오류는 일절 존재하지 않는 청정 무결성 상태(Zero Warning, Zero Compile Error)를 계속해서 유지하고 있습니다. 다만, Leaflet 팝업의 HTML 이스케이프 부재 및 일부 비동기 타이머의 클린업 누락, 그리고 사용되지 않는 평점 필터 상태(minRating) 등의 세부적인 코드 품질 및 보안성 보강 필요 사항이 검출되었습니다.
+
+

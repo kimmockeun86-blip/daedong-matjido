@@ -52,6 +52,19 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
   const [copied, setCopied] = useState(false);
   const [taxiCopied, setTaxiCopied] = useState(false);
 
+  const shareTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const taxiTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const redirectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timers on unmount
+  useEffect(() => {
+    return () => {
+      if (shareTimeoutRef.current) clearTimeout(shareTimeoutRef.current);
+      if (taxiTimeoutRef.current) clearTimeout(taxiTimeoutRef.current);
+      if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current);
+    };
+  }, []);
+
   // 1. 단골 등록 (하트) 상태
   const [isFavorite, setIsFavorite] = useState(() => {
     if (!restaurant) return false;
@@ -309,7 +322,11 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
     const shareText = `[대동맛지도 추천 맛집]\n상호명: ${restaurant.name}\n음식종류: ${restaurant.category}\n대표메뉴: ${restaurant.menu}\n주소: ${restaurant.address}\n전화번호: ${phone}\n추천사유: "${restaurant.review}"`;
     safeCopyToClipboard(shareText).then(() => {
       setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      if (shareTimeoutRef.current) clearTimeout(shareTimeoutRef.current);
+      shareTimeoutRef.current = setTimeout(() => {
+        setCopied(false);
+        shareTimeoutRef.current = null;
+      }, 2000);
       
       try {
         const shares = parseInt(localStorage.getItem('daedong_share_count') || '0', 10);
@@ -325,7 +342,11 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
   const handleTaxiCallClick = () => {
     safeCopyToClipboard(restaurant.address).then(() => {
       setTaxiCopied(true);
-      setTimeout(() => setTaxiCopied(false), 3000);
+      if (taxiTimeoutRef.current) clearTimeout(taxiTimeoutRef.current);
+      taxiTimeoutRef.current = setTimeout(() => {
+        setTaxiCopied(false);
+        taxiTimeoutRef.current = null;
+      }, 3000);
 
       alert(`[대동맛지도 안내]\n식당 주소("${restaurant.address}")가 클립보드에 복사되었습니다.\n\n확인 버튼을 누르면 카카오 T 어플로 연결됩니다. 앱이 열리면 목적지 입력창에 '붙여넣기'하여 편하게 택시를 호출해 보세요!`);
 
@@ -336,7 +357,8 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
       const start = Date.now();
       window.location.href = appUrl;
 
-      setTimeout(() => {
+      if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current);
+      redirectTimeoutRef.current = setTimeout(() => {
         if (Date.now() - start < 2000) {
           if (/iPhone|iPad|iPod/i.test(navigator.userAgent)) {
             window.open(appStoreUrl, '_blank');
@@ -344,6 +366,7 @@ export default function DetailPanel({ restaurant, onClose, isMobile = false }: D
             window.open(playStoreUrl, '_blank');
           }
         }
+        redirectTimeoutRef.current = null;
       }, 1500);
     }).catch((err) => {
       console.error('Taxi address copy failed:', err);

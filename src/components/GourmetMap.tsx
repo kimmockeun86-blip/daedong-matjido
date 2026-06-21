@@ -26,6 +26,17 @@ interface CustomMarker extends L.Marker {
   activeIcon?: L.DivIcon;
 }
 
+function escapeHtml(str: string): string {
+  if (!str) return '';
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+
 export default function GourmetMap({
   restaurants,
   selectedRestaurant,
@@ -268,9 +279,9 @@ export default function GourmetMap({
       // 팝업 설정 (네온 테마)
       const popupContent = `
         <div style="font-family: inherit;">
-          <h4 style="font-size: 13px; font-weight: 700; color: #f8fafc; margin-bottom: 2px;">${res.name}</h4>
-          <p style="font-size: 11px; color: ${categoryColor}; font-weight: 600; margin-bottom: 4px;">★ ${res.rating.toFixed(1)} (${res.category})</p>
-          <p style="font-size: 10px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${res.address}</p>
+          <h4 style="font-size: 13px; font-weight: 700; color: #f8fafc; margin-bottom: 2px;">${escapeHtml(res.name)}</h4>
+          <p style="font-size: 11px; color: ${categoryColor}; font-weight: 600; margin-bottom: 4px;">★ ${res.rating.toFixed(1)} (${escapeHtml(res.category)})</p>
+          <p style="font-size: 10px; color: #94a3b8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 180px;">${escapeHtml(res.address)}</p>
         </div>
       `;
       

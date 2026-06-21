@@ -242,7 +242,6 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('전체');
   const [selectedRegion, setSelectedRegion] = useState('전체');
-  const [minRating, setMinRating] = useState(0);
 
   // 화면 크기 (모바일 여부) 상태 관리
   const [isMobile, setIsMobile] = useState(window.innerWidth <= 768);
@@ -542,7 +541,6 @@ export default function App() {
     setSearchQuery('');
     setSelectedCategory('전체');
     setSelectedRegion('전체');
-    setMinRating(0);
   };
 
   // 4. GPS 기반 내 주변 맛집 찾기 구현 (고정밀 실패 시 일반정밀 Fallback 재시도 적용 - Bug 50)
@@ -556,7 +554,6 @@ export default function App() {
     setSearchQuery('');
     setSelectedCategory('전체');
     setSelectedRegion('전체');
-    setMinRating(0);
 
     const requestPosition = (highAccuracy: boolean) => {
       navigator.geolocation.getCurrentPosition(
@@ -626,7 +623,6 @@ export default function App() {
 
       // 2. 현재 활성화된 필터 조건 검사
       const matchesCategory = selectedCategory === '전체' || restaurant.category === selectedCategory;
-      const matchesRating = restaurant.rating >= minRating;
       const matchesRegion = selectedRegion === '전체' || restaurant.region === selectedRegion;
       
       const query = searchQuery.toLowerCase().trim();
@@ -636,12 +632,11 @@ export default function App() {
         restaurant.review.toLowerCase().includes(query) ||
         restaurant.address.toLowerCase().includes(query);
 
-      const isVisible = matchesCategory && matchesRating && matchesRegion && matchesSearch;
+      const isVisible = matchesCategory && matchesRegion && matchesSearch;
 
       // 3. 필터 조건 불일치 시 필터 해제
       if (!isVisible) {
         setSelectedCategory('전체');
-        setMinRating(0);
         setSelectedRegion('전체');
         setSearchQuery('');
       }
@@ -678,7 +673,7 @@ export default function App() {
       }
     }
     setSelectedRestaurant(restaurant);
-  }, [top10Ids, unlockProgress.isUnlocked, selectedCategory, minRating, selectedRegion, searchQuery, setRestaurants]);
+  }, [top10Ids, unlockProgress.isUnlocked, selectedCategory, selectedRegion, searchQuery, setRestaurants]);
 
   // 딥링크 지원 (?restaurantId=... 또는 ?id=... 또는 ?route=id1,id2,id3)
   useEffect(() => {
@@ -733,7 +728,7 @@ export default function App() {
         setIsToolkitOpen(true);
       }, 0);
     }
-  }, [restaurants, mapRef, top10Ids, unlockProgress.isUnlocked, setIsToolkitOpen, selectedCategory, minRating, selectedRegion, searchQuery, handleSelectRestaurant]);
+  }, [restaurants, mapRef, top10Ids, unlockProgress.isUnlocked, setIsToolkitOpen, selectedCategory, selectedRegion, searchQuery, handleSelectRestaurant]);
 
   // 4.5. 온보딩 맛 취향 웰컴 선택 자동 포커싱 및 줌
   useEffect(() => {
@@ -789,9 +784,6 @@ export default function App() {
       // 6.1. 카테고리 필터
       const matchesCategory = selectedCategory === '전체' || res.category === selectedCategory;
 
-      // 6.2. 평점 필터
-      const matchesRating = res.rating >= minRating;
-
       // 6.3. 지역 필터
       const matchesRegion = selectedRegion === '전체' || res.region === selectedRegion;
 
@@ -803,9 +795,9 @@ export default function App() {
         res.review.toLowerCase().includes(query) ||
         res.address.toLowerCase().includes(query);
 
-      return matchesCategory && matchesRating && matchesRegion && matchesSearch;
+      return matchesCategory && matchesRegion && matchesSearch;
     });
-  }, [restaurants, top10Ids, unlockProgress.isUnlocked, selectedCategory, minRating, selectedRegion, searchQuery]);
+  }, [restaurants, top10Ids, unlockProgress.isUnlocked, selectedCategory, selectedRegion, searchQuery]);
 
   // Bug 35: Clear selectedRestaurant if it gets filtered out
   useEffect(() => {
