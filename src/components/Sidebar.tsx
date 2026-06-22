@@ -383,7 +383,7 @@ export default function Sidebar({
         width: isCollapsed ? '0px' : (isMobile ? 'calc(100% - 16px)' : '410px'),
         maxWidth: isMobile ? 'none' : '410px',
         zIndex: 1000,
-        display: 'flex',
+        display: isMobile && selectedRestaurant ? 'none' : 'flex',
         flexDirection: 'column',
         transition: 'width 0.3s cubic-bezier(0.4, 0, 0.2, 1), left 0.3s, right 0.3s',
         padding: isCollapsed ? '0px' : (isMobile ? '16px' : '24px'),
