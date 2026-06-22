@@ -1019,8 +1019,7 @@ export default function Sidebar({
                     { id: 'worldcup', name: '이상형 월드컵', icon: '🏆', desc: '최애 노포 8강전' },
                     { id: 'share', name: '약속 메이커', icon: '💬', desc: '초대장 공유' },
                     { id: 'instagram', name: '인스타 카드', icon: '📸', desc: '인증서&Wrapped' },
-                    { id: 'quiz', name: '미식 퀴즈', icon: '✏️', desc: '역사 맞추기' },
-                    { id: 'shop', name: '기프트 샵', icon: '🎁', desc: '대동 굿즈' }
+                    { id: 'quiz', name: '미식 퀴즈', icon: '✏️', desc: '역사 맞추기' }
                   ] as const).map((item) => (
                     <button
                       key={item.id}

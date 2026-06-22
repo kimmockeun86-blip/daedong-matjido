@@ -1,5 +1,5 @@
 import { useState, useRef, useMemo, useEffect } from 'react';
-import { X, Gift, Share2, HelpCircle, RotateCcw, Camera, Heart, Trophy, MapPin, Award } from 'lucide-react';
+import { X, Share2, HelpCircle, RotateCcw, Camera, Heart, Trophy, MapPin, Award } from 'lucide-react';
 import type { RestaurantRaw } from '../utils/excel';
 import L from 'leaflet';
 import { safeCopyToClipboard } from '../utils/clipboard';
@@ -977,8 +977,7 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
             { id: 'course', label: '🗺️ 코스 플래너', icon: MapPin },
             { id: 'quiz', label: '🧠 미식 퀴즈', icon: Award },
             { id: 'share', label: '💬 단톡방 공유', icon: Share2 },
-            { id: 'instagram', label: '📸 인증서 발급', icon: Camera },
-            { id: 'shop', label: '🎁 기프트 샵', icon: Gift }
+            { id: 'instagram', label: '📸 인증서 발급', icon: Camera }
           ] as const).map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
