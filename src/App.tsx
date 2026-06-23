@@ -688,6 +688,12 @@ export default function App() {
     if (rId) {
       const matched = restaurants.find(r => r.id === rId || r.name === rId);
       if (matched) {
+        const isLocked = top10Ids.includes(matched.id || '') && !unlockProgress.isUnlocked;
+        if (isLocked) {
+          alert('🔒 대동맛지도 전국 Top 10 노포는 단톡방 공유 3회 또는 미식 일기 2회 작성 시 열람할 수 있습니다!');
+          window.dispatchEvent(new Event('daedong_show_unlock_modal'));
+          return;
+        }
         const timer = setTimeout(() => {
           handleSelectRestaurant(matched);
           if (matched.latitude && matched.longitude && mapRef.current) {
@@ -876,6 +882,7 @@ export default function App() {
             unlockProgress={unlockProgress}
             top10Ids={top10Ids}
             onOpenToolkitTab={handleOpenToolkitTab}
+            visitedRestaurants={visitedRestaurants}
           />
 
           {/* 우하단 개별 맛집 정보 상세 오버레이 카드 */}

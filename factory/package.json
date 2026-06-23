@@ -1,0 +1,12 @@
+{
+  "name": "daedong-matjido-factory",
+  "version": "1.0.0",
+  "description": "24-hour Self-Sustaining AI Factory Engine for Daedong-matjido",
+  "main": "agent_scheduler.js",
+  "type": "module",
+  "dependencies": {
+    "@google/generative-ai": "^0.21.0",
+    "axios": "^1.7.9",
+    "dotenv": "^16.4.7"
+  }
+}

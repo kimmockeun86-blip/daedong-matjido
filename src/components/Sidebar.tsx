@@ -4,6 +4,7 @@ import type { RestaurantRaw } from '../utils/excel';
 import L from 'leaflet';
 import { CATEGORY_IMAGES } from '../constants/images';
 import { safeCopyToClipboard } from '../utils/clipboard';
+import Dashboard from './Dashboard';
 
 const getShareOrigin = (): string => {
   const origin = window.location.origin;
@@ -31,6 +32,7 @@ interface SidebarProps {
   unlockProgress: { shares: number; logs: number; isUnlocked: boolean };
   top10Ids: string[];
   onOpenToolkitTab?: (tab: 'roulette' | 'mbti' | 'couple' | 'worldcup' | 'share' | 'instagram' | 'shop' | 'course' | 'quiz') => void;
+  visitedRestaurants: string[];
 }
 
 // 카테고리별 아이콘 배지 매핑
@@ -42,7 +44,7 @@ const CATEGORY_EMOJIS: Record<string, string> = {
   '양식': '🍕',
   '분식': '🍢',
   '육류': '🥩',
-  '기타': '🍽️'
+  '기타': '🍽'
 };
 
 const categories = ['전체', '한식', '중식', '일식', '양식', '분식', '육류', '기타'];
@@ -64,9 +66,11 @@ export default function Sidebar({
   mapRef,
   unlockProgress,
   top10Ids,
-  onOpenToolkitTab
+  onOpenToolkitTab,
+  visitedRestaurants
 }: SidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [activeTab, setActiveTab] = useState<'list' | 'stats'>('list');
 
   const [showUnlockModal, setShowUnlockModal] = useState(false);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -505,6 +509,49 @@ export default function Sidebar({
               </div>
             </div>
 
+            {/* 탭 헤더 */}
+            <div style={{ display: 'flex', borderBottom: '1px solid rgba(255,255,255,0.06)', margin: '4px 0', flexShrink: 0 }}>
+              <button 
+                type="button"
+                onClick={() => setActiveTab('list')}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === 'list' ? '2.5px solid var(--accent-cyan)' : '2.5px solid transparent',
+                  color: activeTab === 'list' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                  fontWeight: '800',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                🔍 맛집 찾기
+              </button>
+              <button 
+                type="button"
+                onClick={() => setActiveTab('stats')}
+                style={{
+                  flex: 1,
+                  padding: '10px 0',
+                  background: 'transparent',
+                  border: 'none',
+                  borderBottom: activeTab === 'stats' ? '2.5px solid var(--accent-cyan)' : '2.5px solid transparent',
+                  color: activeTab === 'stats' ? 'var(--accent-cyan)' : 'var(--text-secondary)',
+                  fontWeight: '800',
+                  fontSize: '13px',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+              >
+                📊 통계 및 랭킹
+              </button>
+            </div>
+
+            {activeTab === 'list' && (
+              <>
+
             {/* 검색창 */}
             <div style={{ position: 'relative', width: '100%' }}>
               <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
@@ -707,6 +754,8 @@ export default function Sidebar({
             <div style={{ fontSize: '12px', fontWeight: '600', color: 'var(--text-secondary)' }}>
               검색된 맛집 <span style={{ color: 'var(--accent-yellow)' }}>{filteredRestaurants.length}</span>개
             </div>
+              </>
+            )}
           </div>
 
           {/* 2. 스크롤 영역 (Scrollable Content): 나머지 기능 위젯 + 맛집 리스트 */}
@@ -720,7 +769,18 @@ export default function Sidebar({
             paddingRight: '4px',
             minHeight: 0
           }}>
-            {/* 7년 실방문 보증 네온 배너 (데스크톱 전용) */}
+            {activeTab === 'stats' ? (
+              <Dashboard 
+                restaurants={restaurants}
+                visitedRestaurants={visitedRestaurants}
+                onSelectRestaurant={(rest) => {
+                  onSelectRestaurant(rest);
+                  setActiveTab('list');
+                }}
+              />
+            ) : (
+              <>
+                {/* 7년 실방문 보증 네온 배너 (데스크톱 전용) */}
             {!isMobile && (
               <div style={{
                 background: 'linear-gradient(90deg, rgba(249, 115, 22, 0.15) 0%, rgba(234, 179, 8, 0.05) 100%)',
@@ -1328,6 +1388,8 @@ export default function Sidebar({
                 })}
               </div>
             )}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -1446,9 +1508,9 @@ export default function Sidebar({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(2, 6, 17, 0.85)',
-          backdropFilter: 'blur(8px)',
-          WebkitBackdropFilter: 'blur(8px)',
+          background: 'rgba(2, 6, 17, 0.65)',
+          backdropFilter: 'blur(6px)',
+          WebkitBackdropFilter: 'blur(6px)',
           zIndex: 9999,
           display: 'flex',
           justifyContent: 'center',
@@ -1486,37 +1548,23 @@ export default function Sidebar({
                 background: 'rgba(255, 255, 255, 0.02)',
                 border: '1px solid rgba(255, 255, 255, 0.05)',
                 borderRadius: '8px',
-                padding: '12px',
-                display: 'flex',
-                flexDirection: 'column',
-                gap: '8px'
+                padding: '16px',
+                textAlign: 'center',
+                fontSize: '13px',
+                color: '#cbd5e1'
               }}>
-                <div style={{ fontSize: '12px', fontWeight: '700', color: '#f8fafc' }}>
-                  해금 요구 조건 (택 1):
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>💬 단톡방 친구 초대 (공유)</span>
-                  <span style={{ fontWeight: '700', color: unlockProgress.shares >= 3 ? 'var(--accent-green)' : 'var(--accent-pink)' }}>
-                    {unlockProgress.shares} / 3회 {unlockProgress.shares >= 3 && '✓'}
-                  </span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '12px' }}>
-                  <span style={{ color: 'var(--text-secondary)' }}>✍️ 미식 일기 작성 (방문 완료)</span>
-                  <span style={{ fontWeight: '700', color: unlockProgress.logs >= 2 ? 'var(--accent-green)' : 'var(--accent-pink)' }}>
-                    {unlockProgress.logs} / 2회 {unlockProgress.logs >= 2 && '✓'}
-                  </span>
-                </div>
+                📌 해금 조건: <strong>친구한테 추천하기 (초대장 복사)</strong>
               </div>
 
               <button
                 onClick={() => {
-                  const text = `[대동맛지도 초대장]\n7년간 직접 발로 뛴 전국 백년노포 대공개! 지금 대동맛지도에서 확인해보세요.\n링크: ${getShareOrigin()}`;
+                  const text = `[대동맛지도 추천 초대장]\n7년간 직접 발로 뛴 전국 백년노포 대공개! 지금 대동맛지도에서 확인해보세요.\n링크: ${getShareOrigin()}`;
                   safeCopyToClipboard(text).then(() => {
-                    alert('초대장 문구가 복사되었습니다! 친구나 단톡방에 공유해 보세요.');
+                    alert('추천 초대장이 복사되었습니다! 즉시 시크릿 컬렉션이 해금됩니다.');
                     try {
-                      const shares = parseInt(localStorage.getItem('daedong_share_count') || '0', 10);
-                      localStorage.setItem('daedong_share_count', String(shares + 1));
+                      localStorage.setItem('daedong_share_count', '3');
                       window.dispatchEvent(new Event('daedong_unlock_progress'));
+                      setShowUnlockModal(false);
                     } catch (e) {
                       console.error(e);
                     }
@@ -1524,12 +1572,12 @@ export default function Sidebar({
                 }}
                 style={{
                   width: '100%',
-                  padding: '12px 0',
+                  padding: '14px 0',
                   background: 'linear-gradient(90deg, var(--accent-pink) 0%, var(--accent-purple) 100%)',
                   color: '#ffffff',
                   border: 'none',
                   borderRadius: '8px',
-                  fontSize: '13px',
+                  fontSize: '14px',
                   fontWeight: '800',
                   cursor: 'pointer',
                   boxShadow: '0 0 15px rgba(236, 72, 153, 0.3)',
@@ -1538,7 +1586,7 @@ export default function Sidebar({
                 onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
                 onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               >
-                💬 단톡방 공유용 초대장 복사하기
+                💬 추천 초대장 복사하고 해금하기
               </button>
             </div>
           </div>
@@ -1553,9 +1601,9 @@ export default function Sidebar({
           left: 0,
           right: 0,
           bottom: 0,
-          background: 'rgba(3, 7, 18, 0.95)',
-          backdropFilter: 'blur(16px)',
-          WebkitBackdropFilter: 'blur(16px)',
+          background: 'rgba(3, 7, 18, 0.65)',
+          backdropFilter: 'blur(8px)',
+          WebkitBackdropFilter: 'blur(8px)',
           display: 'flex',
           justifyContent: 'center',
           alignItems: 'center',

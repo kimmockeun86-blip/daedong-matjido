@@ -1,4 +1,4 @@
-import { useState, useRef, useMemo, useEffect } from 'react';
+import { useState, useRef, useMemo, useEffect, useCallback } from 'react';
 import { X, Share2, HelpCircle, RotateCcw, Camera, Heart, Trophy, MapPin, Award } from 'lucide-react';
 import type { RestaurantRaw } from '../utils/excel';
 import L from 'leaflet';
@@ -126,6 +126,31 @@ export default function GourmetToolkit({
   const [rouletteList, setRouletteList] = useState<RestaurantRaw[]>([]);
   const [isSpinning, setIsSpinning] = useState(false);
   const [rouletteWinner, setRouletteWinner] = useState<RestaurantRaw | null>(null);
+  const [currentShuffleIdx, setCurrentShuffleIdx] = useState(0);
+  const [rouletteDelay, setRouletteDelay] = useState(40);
+
+  // 1.1 룰렛 후보 식당 5곳 셔플 (useCallback으로 메모이제이션하고 훅 선언 순서 조정)
+  const prepareRoulette = useCallback((): RestaurantRaw[] => {
+    if (restaurants.length === 0) return [];
+    const pool = !isUnlocked
+      ? restaurants.filter(r => !top10Ids.includes(r.id || ''))
+      : restaurants;
+    if (pool.length === 0) return [];
+    const shuffled = [...pool].sort(() => 0.5 - Math.random()).slice(0, 5);
+    setRouletteList(shuffled);
+    setRouletteWinner(null);
+    return shuffled;
+  }, [restaurants, isUnlocked, top10Ids]);
+
+  // 룰렛 최초 진입 시 후보 맛집 자동 셔플링 수행 (UX 결함 복구)
+  useEffect(() => {
+    if (isOpen && restaurants.length > 0 && rouletteList.length === 0) {
+      const timer = setTimeout(() => {
+        prepareRoulette();
+      }, 0);
+      return () => clearTimeout(timer);
+    }
+  }, [isOpen, restaurants, rouletteList.length, prepareRoulette]);
 
   // 2. MBTI 관련 상태
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -534,38 +559,53 @@ export default function GourmetToolkit({
 
   if (!isOpen) return null;
 
-  // 1.1 룰렛 후보 식당 5곳 셔플
-  const prepareRoulette = (): RestaurantRaw[] => {
-    if (restaurants.length === 0) return [];
-    const pool = !isUnlocked
-      ? restaurants.filter(r => !top10Ids.includes(r.id || ''))
-      : restaurants;
-    if (pool.length === 0) return [];
-    const shuffled = [...pool].sort(() => 0.5 - Math.random()).slice(0, 5);
-    setRouletteList(shuffled);
-    setRouletteWinner(null);
-    return shuffled;
-  };
+  // prepareRoulette 및 useEffect가 훅 규칙 준수를 위해 상단(130라인 부근)으로 재배치됨.
 
-  // 1.2 룰렛 회전 애니메이션
+  // 1.2 룰렛 회전 애니메이션 (가/감속 물리학 모델 적용)
   const startSpin = () => {
     let currentList = rouletteList;
     if (currentList.length === 0) {
       currentList = prepareRoulette();
     }
+    if (currentList.length === 0) return;
+
     setIsSpinning(true);
     setRouletteWinner(null);
+    setCurrentShuffleIdx(0);
+    setRouletteDelay(40);
 
-    // 2.5초 동안 네온 회전 모사 후 당첨자 선택
-    setTimeout(() => {
-      if (currentList.length === 0) {
+    let delay = 40; // 초기 회전 속도 (40ms)
+    let stepCount = 0;
+
+    const tick = () => {
+      setCurrentShuffleIdx(prev => (prev + 1) % currentList.length);
+      stepCount++;
+
+      // 물리 법칙 지수 감속 모델 (Exponential Deceleration Physics Model)
+      // 처음 15스텝은 최고 속도(40ms) 유지 후, 이후 매 틱마다 1.15배씩 지연 시간을 늘려 부드럽게 감속
+      if (stepCount > 15) {
+        delay = Math.round(delay * 1.15);
+      }
+
+      // 딜레이 한계치(450ms) 도달 시 루프 정지 및 당첨자 확정
+      if (delay > 450) {
+        const winner = currentList[Math.floor(Math.random() * currentList.length)];
+        setRouletteWinner(winner);
         setIsSpinning(false);
+        setRouletteDelay(40);
+
+        // 햅틱 진동 피드백 (모바일 기기 대응)
+        if (navigator.vibrate) {
+          navigator.vibrate(100);
+        }
         return;
       }
-      const winner = currentList[Math.floor(Math.random() * currentList.length)];
-      setRouletteWinner(winner);
-      setIsSpinning(false);
-    }, 2000);
+
+      setRouletteDelay(delay);
+      setTimeout(tick, delay);
+    };
+
+    setTimeout(tick, delay);
   };
 
   // 2.1 MBTI 문항 답변 처리
@@ -634,7 +674,6 @@ export default function GourmetToolkit({
 
     let pool = baseRestaurants.filter(r => r.category === partner1Pref || r.category === partner2Pref);
     if (pool.length === 0) pool = baseRestaurants;
-    if (pool.length === 0) pool = restaurants;
 
     if (pool.length === 0) {
       alert('등록된 맛집 데이터가 없습니다!');
@@ -1029,7 +1068,7 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
               </div>
 
               {/* 룰렛 디스플레이 박스 */}
-              <div className="ad-slot-box" style={{
+              <div className="roulette-display-box" style={{
                 width: '300px',
                 height: '180px',
                 display: 'flex',
@@ -1042,20 +1081,39 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                 overflow: 'hidden'
               }}>
                 {isSpinning ? (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', alignItems: 'center', width: '100%', padding: '0 20px' }}>
                     <div style={{
-                      width: '32px',
-                      height: '32px',
+                      width: '28px',
+                      height: '28px',
                       borderRadius: '50%',
                       border: '3px solid transparent',
                       borderTopColor: 'var(--accent-cyan)',
                       borderRightColor: 'var(--accent-pink)',
-                      animation: 'spin 0.6s linear infinite'
+                      animation: 'spin 0.5s linear infinite'
                     }}></div>
                     <style>{`
                       @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
                     `}</style>
-                    <span style={{ fontSize: '13px', color: 'var(--accent-cyan)', fontWeight: '700' }}>맛집 후보 엄선 중...</span>
+                    <div 
+                      className="animate-pulse-cyan"
+                      style={{
+                        textAlign: 'center',
+                        filter: `blur(${Math.min(1.2, Math.max(0, 50 / rouletteDelay))}px)`,
+                        transform: 'scale(0.95)',
+                        opacity: 0.85,
+                        transition: 'all 0.1s ease-out'
+                      }}
+                    >
+                      <span style={{ fontSize: '9px', fontWeight: '800', background: 'rgba(6,182,212,0.15)', color: 'var(--accent-cyan)', padding: '2px 6px', borderRadius: '4px' }}>
+                        {rouletteList[currentShuffleIdx]?.category || '엄선'}
+                      </span>
+                      <h4 style={{ fontSize: '20px', fontWeight: '900', color: '#f8fafc', marginTop: '6px', marginBottom: '2px', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '240px' }}>
+                        {rouletteList[currentShuffleIdx]?.name || '맛집 후보 엄선 중...'}
+                      </h4>
+                      <p style={{ fontSize: '10px', color: 'var(--text-muted)', margin: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: '240px' }}>
+                        {rouletteList[currentShuffleIdx]?.address || '위치 분석 중'}
+                      </p>
+                    </div>
                   </div>
                 ) : rouletteWinner ? (
                   <div style={{ textAlign: 'center', padding: '16px' }} className="animate-fade-in">
@@ -1105,12 +1163,12 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                             </span>
                           ))}
                         </div>
-                        <div style={{ color: 'var(--text-secondary)', fontSize: '11px', marginTop: '4px' }}>
+                        <div style={{ color: '#cbd5e1', fontSize: '11px', fontWeight: '700', marginTop: '4px' }}>
                           후보 선정 완료! [ 돌리기 ]를 눌러주세요.
                         </div>
                       </>
                     ) : (
-                      <div style={{ color: 'var(--text-secondary)', fontSize: '12px' }}>
+                      <div style={{ color: '#cbd5e1', fontSize: '12px', fontWeight: '700' }}>
                         [ 돌리기 ] 버튼을 클릭해 주세요!
                       </div>
                     )}
