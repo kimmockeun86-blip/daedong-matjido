@@ -83,6 +83,26 @@ const QUIZ_QUESTIONS = [
   }
 ];
 
+const CATEGORIES = ['전체', '한식', '일식', '중식', '양식', '분식', '육류', '기타'];
+
+const getRegionsList = (list: RestaurantRaw[]): string[] => {
+  const set = new Set<string>();
+  list.forEach(r => {
+    let reg = r.region || '';
+    let cit = r.city || '';
+    if (!reg && r.address) {
+      const parts = r.address.split(' ');
+      reg = parts[0] || '';
+      cit = parts[1] || '';
+    }
+    if (reg) {
+      const key = cit ? `${reg} ${cit}` : reg;
+      set.add(key);
+    }
+  });
+  return ['전체', ...Array.from(set).sort()];
+};
+
 export default function GourmetToolkit({
   isOpen,
   onClose,
@@ -128,29 +148,58 @@ export default function GourmetToolkit({
   const [rouletteWinner, setRouletteWinner] = useState<RestaurantRaw | null>(null);
   const [currentShuffleIdx, setCurrentShuffleIdx] = useState(0);
   const [rouletteDelay, setRouletteDelay] = useState(40);
+  const [rouletteRegion, setRouletteRegion] = useState('전체');
+  const [rouletteCategory, setRouletteCategory] = useState('전체');
 
   // 1.1 룰렛 후보 식당 5곳 셔플 (useCallback으로 메모이제이션하고 훅 선언 순서 조정)
   const prepareRoulette = useCallback((): RestaurantRaw[] => {
     if (restaurants.length === 0) return [];
-    const pool = !isUnlocked
+    
+    // 1단계: 잠금 상태 필터링
+    let pool = !isUnlocked
       ? restaurants.filter(r => !top10Ids.includes(r.id || ''))
       : restaurants;
-    if (pool.length === 0) return [];
+      
+    // 2단계: 음식 카테고리 필터링
+    if (rouletteCategory !== '전체') {
+      pool = pool.filter(r => r.category === rouletteCategory);
+    }
+
+    // 3단계: 지역 필터링
+    if (rouletteRegion !== '전체') {
+      pool = pool.filter(r => {
+        let reg = r.region || '';
+        let cit = r.city || '';
+        if (!reg && r.address) {
+          const parts = r.address.split(' ');
+          reg = parts[0] || '';
+          cit = parts[1] || '';
+        }
+        const key = cit ? `${reg} ${cit}` : reg;
+        return key === rouletteRegion;
+      });
+    }
+
+    if (pool.length === 0) {
+      setRouletteList([]);
+      setRouletteWinner(null);
+      return [];
+    }
     const shuffled = [...pool].sort(() => 0.5 - Math.random()).slice(0, 5);
     setRouletteList(shuffled);
     setRouletteWinner(null);
     return shuffled;
-  }, [restaurants, isUnlocked, top10Ids]);
+  }, [restaurants, isUnlocked, top10Ids, rouletteRegion, rouletteCategory]);
 
   // 룰렛 최초 진입 시 후보 맛집 자동 셔플링 수행 (UX 결함 복구)
   useEffect(() => {
-    if (isOpen && restaurants.length > 0 && rouletteList.length === 0) {
+    if (isOpen && restaurants.length > 0) {
       const timer = setTimeout(() => {
         prepareRoulette();
       }, 0);
       return () => clearTimeout(timer);
     }
-  }, [isOpen, restaurants, rouletteList.length, prepareRoulette]);
+  }, [isOpen, restaurants, rouletteRegion, rouletteCategory, prepareRoulette]);
 
   // 2. MBTI 관련 상태
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
@@ -187,8 +236,9 @@ export default function GourmetToolkit({
   const [receiptItem, setReceiptItem] = useState<{ name: string; price: number } | null>(null);
 
   // 7. 코스 플래너 상태
-  const [courseSelectVal, setCourseSelectVal] = useState('');
   const [routeCopied, setRouteCopied] = useState(false);
+  const [courseSearchQuery, setCourseSearchQuery] = useState('');
+  const [isCourseDropdownOpen, setIsCourseDropdownOpen] = useState(false);
 
   // 8. 미식 퀴즈 상태
   const [quizIdx, setQuizIdx] = useState(0);
@@ -1067,6 +1117,61 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                 <p style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>결정장애 해소! 7년 직접 발로 뛰며 보증한 824곳 중 1곳을 추천해 줍니다.</p>
               </div>
 
+              {/* 필터 컨트롤러 영역 */}
+              <div style={{ display: 'flex', gap: '8px', width: '300px', justifyContent: 'center' }}>
+                <select
+                  value={rouletteRegion}
+                  onChange={(e) => setRouletteRegion(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    border: '1px solid var(--border-glass)',
+                    borderRadius: '8px',
+                    color: '#cbd5e1',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--accent-cyan)'}
+                  onBlur={(e) => e.target.style.borderColor = 'var(--border-glass)'}
+                >
+                  {getRegionsList(restaurants).map((r, idx) => (
+                    <option key={idx} value={r} style={{ background: '#0f172a', color: '#cbd5e1' }}>
+                      📍 {r}
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={rouletteCategory}
+                  onChange={(e) => setRouletteCategory(e.target.value)}
+                  style={{
+                    flex: 1,
+                    padding: '8px 10px',
+                    background: 'rgba(15, 23, 42, 0.85)',
+                    border: '1px solid var(--border-glass)',
+                    borderRadius: '8px',
+                    color: '#cbd5e1',
+                    fontSize: '12px',
+                    fontWeight: '700',
+                    outline: 'none',
+                    cursor: 'pointer',
+                    transition: 'border-color 0.2s'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = 'var(--accent-cyan)'}
+                  onBlur={(e) => e.target.style.borderColor = 'var(--border-glass)'}
+                >
+                  {CATEGORIES.map((c, idx) => (
+                    <option key={idx} value={c} style={{ background: '#0f172a', color: '#cbd5e1' }}>
+                      🍽️ {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
               {/* 룰렛 디스플레이 박스 */}
               <div className="roulette-display-box" style={{
                 width: '300px',
@@ -1168,8 +1273,8 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                         </div>
                       </>
                     ) : (
-                      <div style={{ color: '#cbd5e1', fontSize: '12px', fontWeight: '700' }}>
-                        [ 돌리기 ] 버튼을 클릭해 주세요!
+                      <div style={{ color: 'var(--accent-orange)', fontSize: '11px', fontWeight: '700', textAlign: 'center', padding: '0 16px' }}>
+                        ⚠️ 선택하신 조건에 일치하는 보증 맛집이 없습니다. 다른 필터 조건을 골라주세요!
                       </div>
                     )}
                   </div>
@@ -2502,57 +2607,115 @@ https://daedong.matjido.app/?res=${encodeURIComponent(restName)}
                 background: 'rgba(30, 41, 59, 0.4)',
                 border: '1px solid rgba(255,255,255,0.05)',
                 borderRadius: '8px',
-                padding: '12px'
+                padding: '12px',
+                position: 'relative'
               }}>
-                <select
-                  value={courseSelectVal}
-                  onChange={(e) => setCourseSelectVal(e.target.value)}
-                  style={{
-                    flex: 1,
-                    background: '#0f172a',
-                    border: '1.5px solid var(--border-glass)',
-                    borderRadius: '6px',
-                    color: '#f8fafc',
-                    padding: '8px',
-                    fontSize: '13px',
-                    outline: 'none'
-                  }}
-                >
-                  <option value="">-- 추가할 노포 맛집 선택 --</option>
-                  {restaurants
-                    .filter(r => (isUnlocked || !top10Ids.includes(r.id || '')) && r.latitude !== undefined && r.longitude !== undefined && !routeRestaurants.some(rr => rr.id === r.id))
-                    .map(r => (
-                      <option key={r.id} value={r.id}>
-                        [{r.category}] {r.name} - {r.address}
-                      </option>
-                    ))}
-                </select>
-                <button
-                  onClick={() => {
-                    if (!courseSelectVal) return;
-                    if (routeRestaurants.length >= 5) {
-                      alert('⚠️ 코스는 최대 5개 노포까지만 구성할 수 있습니다. (네이버/카카오 지도 길찾기 연동 한계)');
-                      return;
-                    }
-                    const rest = restaurants.find(r => r.id === courseSelectVal);
-                    if (rest && !routeRestaurants.some(r => r.id === rest.id)) {
-                      setRouteRestaurants([...routeRestaurants, rest]);
-                    }
-                    setCourseSelectVal('');
-                  }}
-                  style={{
-                    padding: '0 16px',
-                    background: 'linear-gradient(135deg, var(--accent-pink) 0%, var(--accent-cyan) 100%)',
-                    border: 'none',
-                    color: '#ffffff',
-                    borderRadius: '6px',
-                    fontSize: '13px',
-                    fontWeight: '700',
-                    cursor: 'pointer'
-                  }}
-                >
-                  코스 추가
-                </button>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <input
+                    type="text"
+                    placeholder="🔍 추가할 맛집 이름 또는 지역 검색 (예: 일미락, 마포)"
+                    value={courseSearchQuery}
+                    onChange={(e) => {
+                      setCourseSearchQuery(e.target.value);
+                      setIsCourseDropdownOpen(true);
+                    }}
+                    onFocus={() => setIsCourseDropdownOpen(true)}
+                    onBlur={() => {
+                      // 아이템 클릭이 정상 처리될 수 있도록 약간의 딜레이를 줌
+                      setTimeout(() => setIsCourseDropdownOpen(false), 250);
+                    }}
+                    style={{
+                      width: '100%',
+                      background: '#0f172a',
+                      border: '1.5px solid var(--border-glass)',
+                      borderRadius: '6px',
+                      color: '#f8fafc',
+                      padding: '8px 12px',
+                      fontSize: '13px',
+                      outline: 'none'
+                    }}
+                  />
+
+                  {/* 자동완성 드롭다운 */}
+                  {isCourseDropdownOpen && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: 0,
+                      right: 0,
+                      background: '#0f172a',
+                      border: '1px solid var(--border-glass)',
+                      borderRadius: '6px',
+                      marginTop: '4px',
+                      maxHeight: '200px',
+                      overflowY: 'auto',
+                      zIndex: 1000,
+                      boxShadow: '0 4px 12px rgba(0,0,0,0.5)'
+                    }}>
+                      {(() => {
+                        const query = courseSearchQuery.toLowerCase().trim();
+                        const matched = restaurants
+                          .filter(r => {
+                            const isAllowed = isUnlocked || !top10Ids.includes(r.id || '');
+                            const isNotAdded = !routeRestaurants.some(rr => rr.id === r.id);
+                            const matchesSearch = query === '' || 
+                              r.name.toLowerCase().includes(query) || 
+                              r.address.toLowerCase().includes(query) || 
+                              r.category.toLowerCase().includes(query);
+                            return isAllowed && isNotAdded && r.latitude !== undefined && r.longitude !== undefined && matchesSearch;
+                          })
+                          .slice(0, 8); // 최대 8개만 노출하여 스크롤 지옥 완벽 해결
+
+                        if (matched.length === 0) {
+                          return (
+                            <div style={{ padding: '10px', fontSize: '11px', color: 'var(--text-secondary)', textAlign: 'center' }}>
+                              일치하는 보증 맛집이 없습니다.
+                            </div>
+                          );
+                        }
+
+                        return matched.map(r => (
+                          <div
+                            key={r.id}
+                            onMouseDown={(e) => {
+                              // onBlur보다 마우스 다운이 먼저 터짐
+                              e.preventDefault(); 
+                              if (routeRestaurants.length >= 5) {
+                                alert('⚠️ 코스는 최대 5개 노포까지만 구성할 수 있습니다. (네이버/카카오 지도 길찾기 연동 한계)');
+                                return;
+                              }
+                              setRouteRestaurants([...routeRestaurants, r]);
+                              setCourseSearchQuery('');
+                              setIsCourseDropdownOpen(false);
+                            }}
+                            style={{
+                              padding: '10px 12px',
+                              fontSize: '12px',
+                              color: '#cbd5e1',
+                              cursor: 'pointer',
+                              borderBottom: '1px solid rgba(255,255,255,0.03)',
+                              transition: 'background 0.2s',
+                              textAlign: 'left'
+                            }}
+                            onMouseEnter={(e) => {
+                              e.currentTarget.style.background = 'rgba(6, 182, 212, 0.1)';
+                              e.currentTarget.style.color = '#fff';
+                            }}
+                            onMouseLeave={(e) => {
+                              e.currentTarget.style.background = 'transparent';
+                              e.currentTarget.style.color = '#cbd5e1';
+                            }}
+                          >
+                            <span style={{ fontSize: '9px', fontWeight: '800', background: 'rgba(255,255,255,0.08)', color: 'var(--accent-cyan)', padding: '2px 4px', borderRadius: '3px', marginRight: '6px' }}>
+                              {r.category}
+                            </span>
+                            <strong>{r.name}</strong> - <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>{r.address}</span>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* 선택된 코스 목록 */}
